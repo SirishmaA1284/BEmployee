@@ -1,0 +1,25 @@
+# Phase 1: only the database is real (needed so Phase 2 migrations have something to run
+# against). backend/frontend/worker services are added in Phase 2 once their Dockerfiles
+# exist — no placeholder services are defined here, per "don't create fake functionality."
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: ai_employee_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ai_employee
+      POSTGRES_PASSWORD: ai_employee
+      POSTGRES_DB: ai_employee
+    ports:
+      - "5432:5432"
+    volumes:
+      - ai_employee_db_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_employee -d ai_employee"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ai_employee_db_data:
