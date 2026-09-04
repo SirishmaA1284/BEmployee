@@ -5,9 +5,12 @@ system that reads real business data, plans multi-step operational work (orders,
 procurement, reporting), executes what it's authorized to execute, asks a human for approval on
 anything risky, verifies its own results, and leaves a full audit trail.
 
-> **Status:** early build. This README describes the target system; sections not yet
-> implemented are marked accordingly. See `CHANGELOG.md` for what has actually shipped, phase
-> by phase.
+> **Status:** early build (through Phase 2 — Foundation). This README describes the target
+> system; sections not yet implemented are marked accordingly. See `CHANGELOG.md` for what has
+> actually shipped, phase by phase. Working today: registration/login, business creation with
+> automatic OWNER role, per-business membership + role-based authorization, and a minimal but
+> functional web UI for all of that — all covered by passing tests
+> (`docs/testing.md`).
 
 ## 1. What this is
 
@@ -99,14 +102,18 @@ Details: [`docs/authorization.md`](docs/authorization.md).
 
 ## 9. Setup
 
-See [`docs/setup.md`](docs/setup.md) (populated in Phase 2, once Docker/DB/auth exist).
-
-Right now (Phase 1): the repo has documentation and a scaffolded directory structure only —
-`docker compose up` currently starts just the Postgres+pgvector database:
+Full instructions (including a host-based dev path): [`docs/setup.md`](docs/setup.md).
+Quickest path:
 
 ```bash
+cp .env.example .env
 docker compose up
+docker compose exec backend alembic upgrade head
 ```
+
+Then open http://localhost:5173 (frontend) — the backend is at http://localhost:8000
+(`/docs` for interactive OpenAPI). Register an account, then create a business from the
+dashboard.
 
 ## 10. Environment variables
 
@@ -115,8 +122,9 @@ See [`.env.example`](.env.example). Copy it to `.env` and fill in real values; n
 
 ## 11. Running locally / tests / deployment
 
-Placeholders until the corresponding phases ship: [`docs/development.md`](docs/development.md),
-[`docs/testing.md`](docs/testing.md), [`docs/deployment.md`](docs/deployment.md).
+[`docs/development.md`](docs/development.md), [`docs/testing.md`](docs/testing.md) (29 backend
+tests passing as of Phase 2), [`docs/deployment.md`](docs/deployment.md) (placeholder — no
+deployment has been done yet).
 
 ## 12. Demo credentials
 

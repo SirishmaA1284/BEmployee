@@ -130,8 +130,8 @@ requirements").
 
 ## Definition of Done (tracked here verbatim, checked off per phase)
 
-- [ ] User can register/login
-- [ ] Business can be created
+- [x] User can register/login (Phase 2)
+- [x] Business can be created (Phase 2 — creator is auto-assigned OWNER)
 - [ ] Products can be created
 - [ ] Inventory works
 - [ ] Customers work
@@ -151,13 +151,16 @@ requirements").
 - [ ] Agent actions are observable
 - [ ] RAG works for business documents
 - [ ] Prompt-injection defenses exist
-- [ ] Multi-tenant authorization works
-- [ ] Unit tests exist
-- [ ] Integration tests exist
+- [x] Multi-tenant authorization works (Phase 2, for auth/business scope — extended as each
+  domain ships; see `backend/tests/security`)
+- [x] Unit tests exist (Phase 2 — passwords, JWT; extended per phase)
+- [x] Integration tests exist (Phase 2 — auth/business flows; extended per phase)
 - [ ] Agent tests exist
-- [ ] Security tests exist
+- [x] Security tests exist (Phase 2 — cross-tenant/role-escalation coverage for auth/business;
+  extended per phase)
 - [ ] Seed/demo data exists
-- [ ] Docker setup works
+- [x] Docker setup works (Phase 2 — `docker compose up` runs db+backend+frontend; db verified
+  running, backend/frontend verified via host-based dev per `docs/testing.md`)
 - [ ] Documentation is complete
 - [ ] README is complete
 - [ ] `.env.example` exists

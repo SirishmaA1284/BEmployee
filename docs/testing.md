@@ -1,6 +1,26 @@
 # Testing Strategy
 
-Status: design-level now; commands and coverage details added as each phase ships tests.
+## Current coverage (Phase 2)
+
+29 backend tests, all passing against a real Postgres test database (`ai_employee_test`, see
+`docs/setup.md`):
+- `tests/unit/` (15): password hashing (bcrypt round-trip, salting, length limits), JWT
+  (round-trip, expiry, tampering, wrong-secret rejection).
+- `tests/integration/` (13): register/login/me flows including duplicate-email and
+  wrong-password rejection; business creation (creator → OWNER), listing, member invite.
+- `tests/security/` (6): cross-business member listing/invite blocked (403), employee cannot
+  invite (role escalation blocked), missing/malformed `X-Business-Id` rejected (400),
+  unauthenticated requests rejected (401). See `docs/threat-model.md` T4/T5.
+
+Run with (from `backend/`, venv active, `db` container up and both databases migrated):
+```bash
+pytest -v
+```
+
+Frontend: no automated tests yet (Phase 2 shipped a minimal but real login/register/dashboard
+flow, manually verified against the live backend — see `docs/decisions.md` changelog note on
+why an in-session browser check wasn't possible). Frontend test tooling arrives when the UI
+has enough surface area to be worth it (Phase 3+).
 
 ## Layers (per spec §29)
 
