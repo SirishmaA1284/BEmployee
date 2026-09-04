@@ -29,3 +29,14 @@ class TimestampMixin:
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
     )
+
+
+class SoftDeleteMixin:
+    """For entities historical records may still reference (products,
+    customers, suppliers) — see docs/decisions.md ADR-009. Queries that
+    should exclude deleted rows must filter `deleted_at.is_(None)`
+    explicitly; there is no automatic global filter (keeps query behavior
+    explicit and auditable rather than "magic").
+    """
+
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)

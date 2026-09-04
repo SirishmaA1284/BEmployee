@@ -58,13 +58,84 @@ All endpoints below are implemented in `backend/app/api/`. Errors use FastAPI's 
 
 - `Authorization: Bearer <JWT>` — required on every endpoint except `/api/auth/register`,
   `/api/auth/login`, and `/health`.
-- `X-Business-Id: <uuid>` — required on every endpoint scoped to a specific business (anything
-  under `/api/businesses/members` today; every business-owned domain added from Phase 3 onward
-  will follow the same convention). The server resolves the caller's role for that business
-  from `business_members` — it is never trusted from the client beyond "which business."
+- `X-Business-Id: <uuid>` — required on every business-scoped endpoint (everything below). The
+  server resolves the caller's role for that business from `business_members` — it is never
+  trusted from the client beyond "which business." A resource id from another business simply
+  doesn't match the query filter, so it 404s rather than 403s (can't distinguish "not yours"
+  from "doesn't exist") — see `backend/tests/security/test_business_domain_isolation.py`.
+
+Role gating below follows `docs/decisions.md` ADR-016.
+
+## Products (`app/api/products.py`)
+
+- `POST /api/products` — OWNER/ADMIN. Body: sku, name, description?, unit, unit_price,
+  cost_price?, reorder_threshold, reorder_quantity. 201 → `ProductRead`; also creates the
+  product's `inventory` row (qty 0) in the same transaction. 409 on duplicate SKU.
+- `GET /api/products?search=` — any role. Excludes soft-deleted products.
+- `GET /api/products/{id}` — any role. 404 if not found/not yours/deleted.
+- `PATCH /api/products/{id}` — OWNER/ADMIN. Partial update; `reorder_threshold`/
+  `reorder_quantity` update the linked `inventory` row.
+- `DELETE /api/products/{id}` — OWNER/ADMIN. Soft delete (`deleted_at`), 204.
+
+## Inventory (`app/api/inventory.py`)
+
+- `GET /api/inventory?low_stock_only=` — any role. Joined product+inventory view with a
+  computed `is_low_stock` flag.
+- `GET /api/inventory/{product_id}` — any role.
+- `POST /api/inventory/{product_id}/adjust` — OWNER/ADMIN. Body: `change_quantity` (nonzero,
+  ±), `note?`. 422 if the result would go negative. Every adjustment writes a `StockMovement`
+  row (reason `ADJUSTMENT`) — quantity is never changed without an audit trail.
+
+## Customers (`app/api/customers.py`)
+
+Standard CRUD (`POST`/`GET`/`GET {id}`/`PATCH {id}`/`DELETE {id}`), any role can write
+(spec §4 "routine operations"). Soft delete.
+
+## Suppliers (`app/api/suppliers.py`)
+
+- Standard CRUD — OWNER/ADMIN only for writes, any role reads.
+- `POST /api/suppliers/{id}/products` — OWNER/ADMIN. Links/updates a product's price + lead
+  time for that supplier (`supplier_products`, upserted).
+- `GET /api/suppliers/{id}/products` — any role.
+- `GET /api/suppliers/compare?product_id=` — any role. Deterministic ranking (active first,
+  then cheapest, then shortest lead time — `app/services/procurement.py`), not an LLM opinion.
+
+## Orders (`app/api/orders.py`)
+
+- `POST /api/orders` — any role. Body: `customer_id`, `items: [{product_id, quantity}]`
+  (duplicate product lines are merged). Validates customer/products exist and are active,
+  checks stock (`app/services/inventory_service.py`), computes totals
+  (`app/services/pricing.py`), decrements inventory + logs `StockMovement`s, and generates an
+  `Invoice` — all in one transaction. 404 unknown customer/product; 422 insufficient stock
+  (no partial order is created).
+- `GET /api/orders`, `GET /api/orders/{id}` — any role.
+- `POST /api/orders/{id}/cancel` — OWNER/ADMIN. Restores stock, voids the invoice. 409 if
+  already cancelled or if the invoice is already `PAID` (refunds aren't supported yet).
+
+## Invoices (`app/api/invoices.py`)
+
+- `GET /api/invoices`, `GET /api/invoices/{id}` — any role. Includes computed `amount_paid`/
+  `amount_due`.
+- `POST /api/invoices/{id}/payments` — any role. Body: `amount`, `method`. 422 if it would
+  exceed the amount due; 409 if the invoice is `VOID`. Marks the invoice `PAID` when the
+  running total exactly covers `total`.
+
+## Purchase Orders (`app/api/purchase-orders.py`)
+
+Interim role gating — OWNER/ADMIN for every write — until the Phase 5 approval engine exists
+(see `docs/decisions.md` ADR-015).
+
+- `POST /api/purchase-orders` — body: `supplier_id`, `items: [{product_id, quantity,
+  unit_cost?}]`. If `unit_cost` is omitted, falls back to the current `supplier_products` price
+  for that supplier+product (422 if neither is available). 422 against an inactive supplier.
+  Created as `DRAFT`.
+- `GET /api/purchase-orders`, `GET /api/purchase-orders/{id}` — any role.
+- `POST /api/purchase-orders/{id}/send` — `DRAFT → SENT`. 409 otherwise.
+- `POST /api/purchase-orders/{id}/receive` — `SENT → COMPLETED`. Increments inventory and logs
+  `StockMovement`s (reason `PURCHASE_RECEIPT`) for every line at its full ordered quantity —
+  partial receipt isn't supported yet. 409 otherwise.
+- `POST /api/purchase-orders/{id}/cancel` — any state except `COMPLETED`. 409 otherwise.
 
 ## Planned domains (not yet implemented)
 
-`/api/products`, `/api/inventory`, `/api/customers`, `/api/orders`, `/api/invoices`,
-`/api/suppliers`, `/api/purchase-orders`, `/api/reports`, `/api/agents`, `/api/approvals`,
-`/api/audit`, `/api/documents`.
+`/api/reports`, `/api/agents`, `/api/approvals`, `/api/audit`, `/api/documents`.

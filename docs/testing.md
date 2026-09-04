@@ -1,20 +1,35 @@
 # Testing Strategy
 
-## Current coverage (Phase 2)
+## Current coverage (through Phase 3)
 
-29 backend tests, all passing against a real Postgres test database (`ai_employee_test`, see
+83 backend tests, all passing against a real Postgres test database (`ai_employee_test`, see
 `docs/setup.md`):
-- `tests/unit/` (15): password hashing (bcrypt round-trip, salting, length limits), JWT
-  (round-trip, expiry, tampering, wrong-secret rejection).
-- `tests/integration/` (13): register/login/me flows including duplicate-email and
-  wrong-password rejection; business creation (creator → OWNER), listing, member invite.
-- `tests/security/` (6): cross-business member listing/invite blocked (403), employee cannot
-  invite (role escalation blocked), missing/malformed `X-Business-Id` rejected (400),
-  unauthenticated requests rejected (401). See `docs/threat-model.md` T4/T5.
+- `tests/unit/` (28): password hashing, JWT, plus Phase 3's deterministic services — pricing
+  (line totals, rounding, tax=0), inventory sufficiency/low-stock math, invoice number
+  formatting, supplier-offer ranking. All pure functions, no DB, no LLM.
+- `tests/integration/` (45): register/login/me, business creation/membership; product CRUD +
+  auto-created inventory + duplicate-SKU rejection; customer CRUD; supplier CRUD + price
+  comparison ranking; inventory adjustment (incl. rejecting a negative result); the full order
+  flow (stock check → decrement → invoice generation → cancel-restores-stock-and-voids-invoice);
+  invoice payments (partial → full → PAID, overpayment rejected); purchase order lifecycle
+  (draft → send → receive-increments-stock, price fallback to `supplier_products`, inactive-
+  supplier rejection).
+- `tests/security/` (10): cross-business member listing/invite blocked, role escalation
+  blocked, malformed/missing `X-Business-Id` rejected, unauthenticated requests rejected,
+  cross-business resource isolation for products/orders/purchase-orders (a resource id from
+  Business A 404s under Business B's membership context, not just business-level access is
+  blocked). See `docs/threat-model.md` T4/T5.
 
 Run with (from `backend/`, venv active, `db` container up and both databases migrated):
 ```bash
 pytest -v
+```
+
+If host→Docker Postgres connections are flaky (see `docs/troubleshooting.md`), run the suite
+through the backend container instead:
+```bash
+docker compose exec backend pip install -r requirements-dev.txt   # once
+docker compose exec -e TEST_DATABASE_URL="postgresql+asyncpg://ai_employee:ai_employee@db:5432/ai_employee_test" backend python -m pytest -v
 ```
 
 Frontend: no automated tests yet (Phase 2 shipped a minimal but real login/register/dashboard

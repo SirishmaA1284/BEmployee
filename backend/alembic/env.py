@@ -1,4 +1,5 @@
 import asyncio
+import sys
 from logging.config import fileConfig
 
 from alembic import context
@@ -8,6 +9,11 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.core.config import get_settings
 from app.models import Base  # noqa: F401 - imports all models onto Base.metadata
+
+# Same asyncpg/ProactorEventLoop incompatibility as backend/tests/conftest.py
+# — see docs/troubleshooting.md.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 config = context.config
 

@@ -80,3 +80,50 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield ac
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+async def business(client: AsyncClient) -> dict:
+    """Registers an OWNER and creates a business for them. Shared by every
+    Phase 3+ domain's tests so each test file doesn't re-implement this
+    boilerplate. Returns owner_headers pre-populated with both the auth
+    token and the X-Business-Id header every business-scoped endpoint needs.
+    """
+    register = await client.post(
+        "/api/auth/register",
+        json={"email": "owner@example.com", "password": "a-strong-password", "full_name": "Owner"},
+    )
+    owner_token = register.json()["access_token"]
+
+    create = await client.post(
+        "/api/businesses",
+        json={"name": "Test Business", "currency": "INR"},
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    business_id = create.json()["id"]
+
+    return {
+        "business_id": business_id,
+        "owner_token": owner_token,
+        "owner_headers": {"Authorization": f"Bearer {owner_token}", "X-Business-Id": business_id},
+    }
+
+
+@pytest.fixture
+async def employee_headers(client: AsyncClient, business: dict) -> dict:
+    """Registers a second user and has the owner invite them as EMPLOYEE
+    into `business`. Returns headers for that employee.
+    """
+    register = await client.post(
+        "/api/auth/register",
+        json={"email": "employee@example.com", "password": "a-strong-password", "full_name": "Employee"},
+    )
+    employee_token = register.json()["access_token"]
+
+    await client.post(
+        "/api/businesses/members",
+        json={"email": "employee@example.com", "role": "EMPLOYEE"},
+        headers=business["owner_headers"],
+    )
+
+    return {"Authorization": f"Bearer {employee_token}", "X-Business-Id": business["business_id"]}

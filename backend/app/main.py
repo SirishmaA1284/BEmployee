@@ -3,7 +3,7 @@ import uuid
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, businesses
+from app.api import auth, businesses, customers, inventory, invoices, orders, products, purchase_orders, suppliers
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -39,3 +39,10 @@ async def health() -> dict[str, str]:
 
 app.include_router(auth.router)
 app.include_router(businesses.router)
+app.include_router(products.router)
+app.include_router(inventory.router)
+app.include_router(customers.router)
+app.include_router(suppliers.router)
+app.include_router(orders.router)
+app.include_router(invoices.router)
+app.include_router(purchase_orders.router)

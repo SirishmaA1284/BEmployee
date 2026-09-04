@@ -128,17 +128,77 @@ currency (default INR/₹, configurable per business as a string code for future
 roadmap item, not implemented speculatively (Rule "don't design for hypothetical future
 requirements").
 
+## ADR-013: Phase 3 is backend + tests only, no new frontend domain pages
+
+**Decision:** Phase 3 (Core Business) implements products, inventory, customers, suppliers,
+orders, invoices, and purchase orders as API + services + tests only. The frontend keeps its
+Phase 2 auth/business/dashboard pages; Orders/Inventory/Suppliers/Purchase Orders pages are
+built alongside the AI Employee chat interface in Phase 4, where they're most useful (seeing
+what the agent did).
+
+**Why:** The spec's own Phase 3 description (§40) lists only backend work ("with proper
+tests"); frontend domain pages are listed under §18 without a phase binding. Building seven
+CRUD UIs before the AI employee exists to act on them would be UI for its own sake this early —
+better to spend that effort once Phase 4 needs real data to display AI actions against.
+
+## ADR-014: Single-invoice-per-order, zero tax, sequential invoice numbering for MVP
+
+**Decision:**
+- One invoice is generated synchronously per order at creation time (`invoices.order_id` is
+  unique) — no partial/split invoicing in MVP, even though `invoice_items` exists as its own
+  table (mirrors `order_items` 1:1 today, ready for partial invoicing later without a schema
+  change).
+- `tax_amount` is stored per order/invoice but computed as `0` for MVP — no tax engine.
+  `docs/requirements.md` A1 already scopes MVP to a single currency; tax logic is genuinely
+  business/jurisdiction-specific and out of scope until a real requirement names a scheme.
+- Invoice numbers are `INV-{business-scoped sequential count}`, computed as
+  `count(existing invoices for business) + 1` inside the creating transaction. This has a known
+  race condition under concurrent order creation for the same business (two simultaneous
+  requests could compute the same count) — acceptable for MVP's synchronous, low-concurrency
+  usage pattern; a production hardening pass would use a DB sequence or `SELECT ... FOR UPDATE`
+  per business.
+
+**Why:** Matches Rule 4 (deterministic backend calculation, never LLM) and avoids building tax/
+partial-invoicing machinery nobody has asked for yet (no premature abstraction).
+
+## ADR-015: Purchase orders implement only the non-approval lifecycle in Phase 3
+
+**Decision:** `PurchaseOrderStatus` for Phase 3 is `DRAFT → SENT → COMPLETED`, plus
+`CANCELLED`. The `PENDING_APPROVAL`/`APPROVED` states from FR-9 are added as an enum + workflow
+change in Phase 5 when the policy/approval engine exists to actually gate them. Until then,
+creating and sending a purchase order is restricted to `OWNER`/`ADMIN` roles (interim
+safeguard, not a substitute for the real approval gate) rather than left open to `EMPLOYEE`.
+
+**Why:** Adding unused enum states/workflow branches before the approval engine exists to drive
+them would be dead code (Rule 6 spirit — don't build machinery nothing calls yet); this is
+tracked explicitly here so Phase 5 knows to revisit both the enum and the role restriction.
+
+## ADR-016: Role gating for Phase 3 write operations
+
+**Decision:**
+- Products, suppliers, supplier-product links, inventory adjustments, purchase orders:
+  `OWNER`/`ADMIN` only for writes; any role can read.
+- Customers, orders, invoice payments: any role (including `EMPLOYEE`) can write — these are
+  the "routine operations" spec §4 explicitly grants employees.
+- Order cancellation: `OWNER`/`ADMIN` only (reverses stock and voids a financial document —
+  treated as more sensitive than creating one).
+
+**Why:** Direct application of spec §4's Owner/Employee capability split, made concrete where
+the spec is silent on a specific action; documented so Phase 5's real risk-classification layer
+has a stated starting point to formalize rather than invent from scratch.
+
 ## Definition of Done (tracked here verbatim, checked off per phase)
 
 - [x] User can register/login (Phase 2)
 - [x] Business can be created (Phase 2 — creator is auto-assigned OWNER)
-- [ ] Products can be created
-- [ ] Inventory works
-- [ ] Customers work
-- [ ] Orders work
-- [ ] Invoices work
-- [ ] Suppliers work
-- [ ] Purchase orders work
+- [x] Products can be created (Phase 3)
+- [x] Inventory works (Phase 3 — tracked via immutable `stock_movements`, not just a counter)
+- [x] Customers work (Phase 3)
+- [x] Orders work (Phase 3 — stock check, decrement, invoice generation, cancellation)
+- [x] Invoices work (Phase 3 — auto-generated per order, payments, PAID/VOID transitions)
+- [x] Suppliers work (Phase 3 — incl. price comparison ranking)
+- [x] Purchase orders work (Phase 3 — draft/send/receive/cancel; approval gating is Phase 5,
+  see ADR-015)
 - [ ] AI employee interface works
 - [ ] Agent can execute an order workflow
 - [ ] Agent can check inventory
@@ -151,13 +211,16 @@ requirements").
 - [ ] Agent actions are observable
 - [ ] RAG works for business documents
 - [ ] Prompt-injection defenses exist
-- [x] Multi-tenant authorization works (Phase 2, for auth/business scope — extended as each
-  domain ships; see `backend/tests/security`)
-- [x] Unit tests exist (Phase 2 — passwords, JWT; extended per phase)
-- [x] Integration tests exist (Phase 2 — auth/business flows; extended per phase)
+- [x] Multi-tenant authorization works (Phase 2 for auth/business scope, Phase 3 extended to
+  every business-owned resource — resource ids from another business 404 under your own
+  membership context; see `backend/tests/security`)
+- [x] Unit tests exist (Phase 2 — passwords, JWT; Phase 3 — pricing/inventory/invoicing/
+  procurement math; extended per phase)
+- [x] Integration tests exist (Phase 2 — auth/business flows; Phase 3 — every Core Business
+  domain's CRUD + the order/invoice/purchase-order flows; extended per phase)
 - [ ] Agent tests exist
-- [x] Security tests exist (Phase 2 — cross-tenant/role-escalation coverage for auth/business;
-  extended per phase)
+- [x] Security tests exist (Phase 2 — cross-tenant/role-escalation for auth/business; Phase 3 —
+  cross-tenant resource isolation for products/orders/purchase-orders; extended per phase)
 - [ ] Seed/demo data exists
 - [x] Docker setup works (Phase 2 — `docker compose up` runs db+backend+frontend; db verified
   running, backend/frontend verified via host-based dev per `docs/testing.md`)

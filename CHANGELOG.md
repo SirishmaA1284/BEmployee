@@ -63,6 +63,46 @@ No application code yet — this phase is documentation and repository structure
   `database.md`, `testing.md`, `troubleshooting.md`; `decisions.md` Definition-of-Done
   checklist updated for what's actually done.
 
-### Next: Phase 3 — Core Business
+### Phase 3 — Core Business (2026-09-04)
 
-Products, inventory, customers, orders, invoices, suppliers, purchase orders — with tests.
+- Models: `Product`, `Inventory`, `StockMovement` (immutable audit log of every stock change),
+  `Customer`, `Supplier`, `SupplierProduct`, `Order`, `OrderItem`, `Invoice`, `InvoiceItem`,
+  `Payment`, `PurchaseOrder`, `PurchaseOrderItem`. Migration `54c4b61cdb48` generated via
+  `--autogenerate` and reviewed by hand.
+- Deterministic services (`app/services/`, unit-tested, no DB/LLM): `pricing.py` (line totals,
+  rounding, tax — always 0 for MVP), `inventory_service.py` (stock-sufficiency/low-stock
+  checks), `invoicing.py` (invoice number formatting), `procurement.py` (supplier ranking:
+  active-first, then cheapest, then shortest lead time).
+- API: full CRUD for products (auto-creates inventory), customers, suppliers (+
+  supplier-product price/lead-time links + `/compare`); inventory listing/adjustment (every
+  adjustment logs a `StockMovement`); order creation (stock check → decrement → invoice
+  generation, all in one transaction) and cancellation (restores stock, voids invoice); invoice
+  payments (partial → full → `PAID`, overpayment rejected); purchase order lifecycle
+  (draft → send → receive-increments-stock, with price fallback to `supplier_products`).
+- Role gating (`docs/decisions.md` ADR-016): products/suppliers/inventory-adjustments/purchase-
+  orders restricted to OWNER/ADMIN; customers/orders/payments open to any role per spec §4's
+  "routine operations" grant to employees. Purchase orders implement only the non-approval
+  lifecycle for now (ADR-015) — full approval gating is Phase 5.
+- Tests: 83 passing total (54 new) — 13 more unit (pure deterministic-service tests), 32 more
+  integration (every domain's CRUD + the order/invoice/purchase-order flows above), 3 more
+  security (cross-business resource isolation for products/orders/purchase-orders, proving a
+  resource id from another business 404s under your own membership context, not just that
+  business-level access is blocked).
+- Verified end-to-end via live HTTP calls against the running Docker stack: register → create
+  business → create product → adjust stock → create order (stock decremented, invoice
+  generated with correct total) → compare supplier prices → create purchase order → send →
+  receive (stock incremented) — all matched expected values.
+- Docs updated: `api.md` (every new endpoint), `database.md` (new tables + ERD),
+  `workflows.md` (order-processing and procurement flow diagrams, filled in from placeholder),
+  `troubleshooting.md` (a Windows Docker-networking quirk hit and fixed during this phase —
+  host→published-port connections occasionally need `docker compose restart <service>`; worked
+  around for migrations by running Alembic through the container instead of the host venv).
+- Known limitations carried forward explicitly (not silently skipped): no partial invoicing, no
+  partial PO receipt, no tax engine, no frontend pages for these domains yet (ADR-013 — parked
+  until Phase 4 needs them to show agent activity against), invoice numbering has a known race
+  condition under concurrent creation (ADR-014).
+
+### Next: Phase 4 — AI Employee
+
+Agent orchestrator, Order Agent, Inventory Agent, tool registry, structured outputs, agent
+state — with tests.

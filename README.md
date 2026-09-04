@@ -5,12 +5,15 @@ system that reads real business data, plans multi-step operational work (orders,
 procurement, reporting), executes what it's authorized to execute, asks a human for approval on
 anything risky, verifies its own results, and leaves a full audit trail.
 
-> **Status:** early build (through Phase 2 — Foundation). This README describes the target
+> **Status:** early build (through Phase 3 — Core Business). This README describes the target
 > system; sections not yet implemented are marked accordingly. See `CHANGELOG.md` for what has
-> actually shipped, phase by phase. Working today: registration/login, business creation with
-> automatic OWNER role, per-business membership + role-based authorization, and a minimal but
-> functional web UI for all of that — all covered by passing tests
-> (`docs/testing.md`).
+> actually shipped, phase by phase. Working today: registration/login, businesses with
+> role-based multi-tenant authorization, and full CRUD + business logic for products
+> (with auto-tracked inventory), customers, suppliers (with price comparison), orders (stock
+> check → decrement → invoice generation), invoices/payments, and purchase orders
+> (draft → send → receive) — all via API, covered by 83 passing tests (`docs/testing.md`). No
+> AI/agent layer yet (Phase 4) and no frontend pages for the Phase 3 domains yet (they land
+> alongside the AI Employee UI — see `docs/decisions.md` ADR-013).
 
 ## 1. What this is
 
@@ -122,8 +125,8 @@ See [`.env.example`](.env.example). Copy it to `.env` and fill in real values; n
 
 ## 11. Running locally / tests / deployment
 
-[`docs/development.md`](docs/development.md), [`docs/testing.md`](docs/testing.md) (29 backend
-tests passing as of Phase 2), [`docs/deployment.md`](docs/deployment.md) (placeholder — no
+[`docs/development.md`](docs/development.md), [`docs/testing.md`](docs/testing.md) (83 backend
+tests passing as of Phase 3), [`docs/deployment.md`](docs/deployment.md) (placeholder — no
 deployment has been done yet).
 
 ## 12. Demo credentials
