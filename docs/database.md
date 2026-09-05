@@ -136,11 +136,27 @@ erDiagram
     }
 ```
 
+## Phase 4 tables (Agent observability — FR-14/FR-15)
+
+One `agent_sessions` row per chat request; one `agent_tasks` row per workflow run; one
+`agent_actions` row per tool call, written **structurally by the tool registry** — agent code
+cannot call a tool without recording, and cannot record without calling a tool (ADR-003).
+
+- **`agent_sessions`** — `business_id`, `user_id`, `intent` (enum: CREATE_ORDER,
+  CHECK_INVENTORY, LOW_STOCK, COMPARE_SUPPLIERS, CREATE_PURCHASE_ORDER, SEARCH_PRODUCTS,
+  SEARCH_CUSTOMERS, SALES_REPORT, UNKNOWN), `status` (RUNNING, COMPLETED, FAILED,
+  NEEDS_CLARIFICATION), `user_message`, `reply?`, `completed_at?`.
+- **`agent_tasks`** — `session_id`, `agent_name` (order/inventory/procurement/customer/finance),
+  `status` (RUNNING, COMPLETED, FAILED), `started_at`, `completed_at?`.
+- **`agent_actions`** — `task_id`, `business_id`, `tool_name`, `status` (SUCCESS, FAILED,
+  REJECTED), `risk_level` (LOW/MEDIUM — deterministic, ADR-004), `input_summary` (JSONB,
+  compacted), `result_summary` (JSONB, compacted), `created_by_user_id`, `created_at`. No
+  `updated_at` — an audit row is never edited (same rule as `stock_movements`).
+
 ## Planned tables (not yet implemented)
 
-`business_policies, documents, document_chunks (pgvector), agent_sessions, agent_tasks,
-agent_actions, approval_requests, audit_logs, notifications` — added domain by domain in
-Phases 4–7, each documented here when it ships.
+`business_policies, documents, document_chunks (pgvector), approval_requests, audit_logs,
+notifications` — added domain by domain in Phases 5–7, each documented here when it ships.
 
 ## Migration workflow
 
@@ -156,9 +172,12 @@ Migrations so far:
 - `54c4b61cdb48` — Phase 3: `products`, `inventory`, `stock_movements`, `customers`,
   `suppliers`, `supplier_products`, `orders`, `order_items`, `invoices`, `invoice_items`,
   `payments`, `purchase_orders`, `purchase_order_items`.
+- `f2c2e0ac428e` — Phase 4: `agent_sessions`, `agent_tasks`, `agent_actions`.
 
-Both were generated via `alembic revision --autogenerate` against a real Postgres instance,
-reviewed by hand, and applied before being committed.
+Each was generated via `alembic revision --autogenerate` against a real Postgres instance,
+reviewed by hand, and applied before being committed. To migrate the dedicated test database
+(`ai_employee_test`), alembic reads `DATABASE_URL`, so run it with that env var pointed at the
+test DB (not `TEST_DATABASE_URL`, which only the pytest fixtures use).
 
 **Local-dev note:** on this Windows dev machine, running Alembic/asyncpg directly against the
 Docker-mapped Postgres port from the host was unreliable (see `docs/troubleshooting.md`); the

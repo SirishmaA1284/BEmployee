@@ -25,6 +25,14 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:5173"
 
+    # --- Phase 4: LLM provider (docs/decisions.md ADR-005) ---
+    llm_provider: str = "mock"  # openai | anthropic | gemini | mock
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+
+    # Cap on agent steps per chat request (NFR-3: no unbounded LLM loops).
+    max_agent_steps: int = 10
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

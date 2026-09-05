@@ -51,3 +51,41 @@ class PurchaseOrderStatus(str, enum.Enum):
     SENT = "SENT"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
+
+
+class AgentIntent(str, enum.Enum):
+    """Intents the orchestrator classifies a chat request into (FR-11).
+
+    Each maps to exactly one workflow graph in app/agents/workflows. The
+    classification is a structured LLM call whose output is validated
+    against this enum before any routing happens.
+    """
+
+    CREATE_ORDER = "CREATE_ORDER"
+    CHECK_INVENTORY = "CHECK_INVENTORY"
+    LOW_STOCK = "LOW_STOCK"
+    COMPARE_SUPPLIERS = "COMPARE_SUPPLIERS"
+    CREATE_PURCHASE_ORDER = "CREATE_PURCHASE_ORDER"
+    SEARCH_PRODUCTS = "SEARCH_PRODUCTS"
+    SEARCH_CUSTOMERS = "SEARCH_CUSTOMERS"
+    SALES_REPORT = "SALES_REPORT"
+    UNKNOWN = "UNKNOWN"
+
+
+class AgentSessionStatus(str, enum.Enum):
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    NEEDS_CLARIFICATION = "NEEDS_CLARIFICATION"
+
+
+class AgentTaskStatus(str, enum.Enum):
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class AgentActionStatus(str, enum.Enum):
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+    REJECTED = "REJECTED"

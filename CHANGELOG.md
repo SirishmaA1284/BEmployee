@@ -102,7 +102,48 @@ No application code yet — this phase is documentation and repository structure
   until Phase 4 needs them to show agent activity against), invoice numbering has a known race
   condition under concurrent creation (ADR-014).
 
-### Next: Phase 4 — AI Employee
+### Phase 4 — AI Employee (2026-09-05)
 
-Agent orchestrator, Order Agent, Inventory Agent, tool registry, structured outputs, agent
-state — with tests.
+- LLM abstraction (`app/core/llm/`): provider-neutral `LLMProvider.generate` interface
+  (ADR-005), `OpenAIProvider` (function calling; all failures mapped to structured responses),
+  `MockProvider` (scripted + keyword rules — deterministic, keyless), factory with
+  openai-without-key falling back to mock (ADR-019). Anthropic/Gemini stubs raise
+  `NotImplementedError`.
+- Tool registry (`app/tools/`, ADR-003): 13 schema-validated, permissioned tools wrapping the
+  Phase 3 services; every call validates args + role server-side, classifies risk
+  deterministically, and persists an `agent_actions` row (FR-14) with compact JSON-safe
+  summaries — never raw chain-of-thought.
+- Agents (`app/agents/`): LangGraph orchestrator (classify → route → workflow) plus Order,
+  Inventory (check/low-stock), Procurement (compare + direct/low-stock-driven PO), Customer,
+  Finance/Reporting, Policy (risk seam), and Verification (FR-19 re-reads state, re-checks the
+  math) workflows — all registry-only data access, per-request step cap (NFR-3).
+- Order/PO creation extracted from the API endpoints into `app/services/order_service.py` /
+  `purchase_order_service.py` so REST and agent tool paths share one deterministic code path;
+  `app/services/reporting.py` for the sales summary.
+- Persistence: `agent_sessions`/`agent_tasks`/`agent_actions` models + migration
+  `f2c2e0ac428e`; chat API `POST /api/agent/chat`, `GET /api/agent/sessions[/{id}]`
+  (FR-11/14/15, ADR-020).
+- Frontend: shared nav layout, **AI Employee chat page** (examples, structured result tables,
+  recent-activity sidebar) and the deferred Phase 3 domain pages — Orders, Inventory,
+  Suppliers (with product links), Purchase Orders — wired to the live API via TanStack Query.
+  Fixed the pre-existing `tsc -b` build break on TypeScript 5.9 (TS6310) by splitting the
+  typecheck per tsconfig.
+- Tests: 125 total (42 new) — unit (providers/registry/risk), `tests/agents/` (scripted
+  workflow end-to-end), and chat API integration (incl. tenant isolation of sessions and role
+  denial through the agent path). Fixed a pytest-asyncio 0.24.0 crash on this Windows box (the
+  redefined-event_loop introspection bug) in `tests/conftest.py`; engine disposal moved into
+  the loop fixture so asyncpg teardown can never outlive its loop.
+- Docs: `agents.md`/`tools.md` filled in from placeholders, `api.md`/`database.md`/
+  `testing.md` updated, ADRs 017–020 added, DoD checklist updated. `.env.example` defaults
+  `LLM_PROVIDER=mock` and documents `MAX_AGENT_STEPS`.
+- Known limitations carried forward explicitly: workflow resume/memory is Phase 5+ (ADR-020);
+  the policy engine (thresholds, approval requests) is Phase 5 (ADR-004 seam); no frontend
+  automated tests yet.
+
+### Next: Phase 5 — Approval & Policies
+
+Policy engine (`business_policies`), risk classification with real thresholds, approval
+requests + UI, unified `audit_logs`, purchase orders gaining their PENDING_APPROVAL/APPROVED
+states (ADR-015).
+
+## [Unreleased]

@@ -33,14 +33,25 @@ def event_loop():
     per test (pytest-asyncio's default) breaks asyncpg's connection pool.
     """
     loop = asyncio.get_event_loop_policy().new_event_loop()
+    # pytest-asyncio 0.24.0's hookwrapper inspects the redefined event_loop
+    # fixture to emit a deprecation warning; `inspect.getsourcelines` fails
+    # with OSError when the fixture module is loaded through pytest's
+    # assertion-rewriting loader. Marking the loop as pytest-asyncio's own
+    # skips that broken path — the loop is deliberately ours.
+    setattr(loop, "__original_fixture_loop", True)
     yield loop
+    # Dispose the engine on THIS loop before it closes, regardless of other
+    # session-scoped fixtures' teardown order (asyncpg pool cleanup must
+    # never outlive its event loop).
+    loop.run_until_complete(test_engine.dispose())
     loop.close()
 
 
 @pytest.fixture(scope="session", autouse=True)
 async def _dispose_engine_at_end():
+    # Kept as a no-op placeholder: engine disposal happens in `event_loop`
+    # teardown so it is ordered before loop close deterministically.
     yield
-    await test_engine.dispose()
 
 
 @pytest.fixture(autouse=True)

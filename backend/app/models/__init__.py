@@ -3,10 +3,15 @@ SQLAlchemy's mapper configuration see the full schema from a single import.
 """
 
 from app.database.base import Base
+from app.models.agent import AgentAction, AgentSession, AgentTask
 from app.models.business import Business
 from app.models.business_member import BusinessMember
 from app.models.customer import Customer
 from app.models.enums import (
+    AgentActionStatus,
+    AgentIntent,
+    AgentSessionStatus,
+    AgentTaskStatus,
     BusinessRole,
     InvoiceStatus,
     OrderStatus,
@@ -52,4 +57,11 @@ __all__ = [
     "PurchaseOrder",
     "PurchaseOrderItem",
     "PurchaseOrderStatus",
+    "AgentSession",
+    "AgentTask",
+    "AgentAction",
+    "AgentIntent",
+    "AgentSessionStatus",
+    "AgentTaskStatus",
+    "AgentActionStatus",
 ]

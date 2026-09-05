@@ -187,6 +187,52 @@ tracked explicitly here so Phase 5 knows to revisit both the enum and the role r
 the spec is silent on a specific action; documented so Phase 5's real risk-classification layer
 has a stated starting point to formalize rather than invent from scratch.
 
+## ADR-017: LangGraph graphs are built per request; nodes return state updates, never mutate
+
+**Decision:** The orchestrator and every workflow graph are compiled per chat request, with
+the request's DB session and LLM provider closed over by the node functions. Agent state is a
+plain JSON-serializable `TypedDict`. LangGraph 1.x passes nodes a shallow copy of state, so
+nodes never mutate top-level keys — every update (including errors, `llm_calls`, scratch ids)
+is merged via the node's return dict. Nested shared objects (e.g. `tool_results`) are the
+documented exception.
+
+**Why:** Matches ADR-002's "typed state, explicit nodes" without paying for cross-request
+persistence we don't use yet (checkpointing/resume is Phase 5–6). Making the mutation rule
+explicit in code (helpers return partial-state updates) turned a subtle LangGraph behavior into
+a tested convention instead of a bug source.
+
+## ADR-018: Entity extraction is a prompt-layer tool call, not a registry tool
+
+**Decision:** Intent classification and entity extraction (customer name, product lines,
+quantities, supplier name) are structured LLM calls whose single "tool" (`classify_intent`,
+`extract_order`, …) is defined in `app/agents/` and validated against a Pydantic schema before
+routing. These virtual tools are NOT in the registry, never touch the database, and are not
+audited as agent actions — the actions that matter (searches, writes) are.
+
+**Why:** Keeps the registry's audit trail meaningful (business-data operations only, FR-14) and
+keeps extraction logic next to the prompts that use it. The LLM proposes *what* to do; ids,
+prices and stock are always resolved from registry results, never invented (ADR-003/004).
+
+## ADR-019: openai-without-key falls back to MockProvider; mock is the CI/demo default
+
+**Decision:** `LLM_PROVIDER=mock` is the documented default (`.env.example`). Selecting
+`openai` without `OPENAI_API_KEY` also returns the MockProvider instead of failing, so a fresh
+clone and the test suite always run green and demos work offline. Anthropic/Gemini remain
+stubs that raise `NotImplementedError`.
+
+**Why:** ADR-005's testability requirement, applied to the whole app rather than just tests.
+
+## ADR-020: Chat runs synchronously in-request; persistence is for inspection now, resume later
+
+**Decision:** `POST /api/agent/chat` runs the full agent cycle within the HTTP request and
+returns the reply + structured result. Sessions/tasks/actions are persisted for audit and
+observability (FR-14/FR-15). Workflow *resumption* (pick up a failed task, continue a
+conversation with memory) is not implemented — it lands with LangGraph checkpointing in a
+later phase rather than bolting a half-designed resume path on now.
+
+**Why:** Matches the phase scope (observability is a Phase 4 DoD item; resume/memory is not)
+and avoids building resumability machinery nothing calls yet (Rule 6 spirit).
+
 ## Definition of Done (tracked here verbatim, checked off per phase)
 
 - [x] User can register/login (Phase 2)
@@ -199,31 +245,38 @@ has a stated starting point to formalize rather than invent from scratch.
 - [x] Suppliers work (Phase 3 — incl. price comparison ranking)
 - [x] Purchase orders work (Phase 3 — draft/send/receive/cancel; approval gating is Phase 5,
   see ADR-015)
-- [ ] AI employee interface works
-- [ ] Agent can execute an order workflow
-- [ ] Agent can check inventory
-- [ ] Agent can identify low stock
-- [ ] Agent can compare suppliers
-- [ ] Agent can prepare purchase orders
+- [x] AI employee interface works (Phase 4 — `/api/agent/chat` + chat UI; MockProvider default
+  so it works without an API key, OpenAI when configured)
+- [x] Agent can execute an order workflow (Phase 4 — extract → resolve → create → verify →
+  summarize; tests in `backend/tests/agents`)
+- [x] Agent can check inventory (Phase 4)
+- [x] Agent can identify low stock (Phase 4)
+- [x] Agent can compare suppliers (Phase 4 — same deterministic ranking as the REST endpoint)
+- [x] Agent can prepare purchase orders (Phase 4 — direct and low-stock-driven; OWNER/ADMIN
+  gated via the tool registry)
 - [ ] Approval workflow works
 - [ ] Policies work
-- [ ] Audit logs work
-- [ ] Agent actions are observable
+- [ ] Audit logs work (agent_actions audit trail exists from Phase 4; the unified
+  `audit_logs` table for ALL state changes lands in Phase 5)
+- [x] Agent actions are observable (Phase 4 — sessions/tasks/actions API + activity sidebar)
 - [ ] RAG works for business documents
 - [ ] Prompt-injection defenses exist
 - [x] Multi-tenant authorization works (Phase 2 for auth/business scope, Phase 3 extended to
   every business-owned resource — resource ids from another business 404 under your own
-  membership context; see `backend/tests/security`)
+  membership context; Phase 4 extended to agent sessions; see `backend/tests/security` +
+  `tests/integration/test_agent_chat.py`)
 - [x] Unit tests exist (Phase 2 — passwords, JWT; Phase 3 — pricing/inventory/invoicing/
-  procurement math; extended per phase)
+  procurement math; Phase 4 — providers, registry, risk; extended per phase)
 - [x] Integration tests exist (Phase 2 — auth/business flows; Phase 3 — every Core Business
-  domain's CRUD + the order/invoice/purchase-order flows; extended per phase)
-- [ ] Agent tests exist
+  domain's CRUD + the order/invoice/purchase-order flows; Phase 4 — agent chat flows;
+  extended per phase)
+- [x] Agent tests exist (Phase 4 — scripted-MockProvider workflows in `backend/tests/agents`)
 - [x] Security tests exist (Phase 2 — cross-tenant/role-escalation for auth/business; Phase 3 —
-  cross-tenant resource isolation for products/orders/purchase-orders; extended per phase)
+  cross-tenant resource isolation for products/orders/purchase-orders; Phase 4 — role denial
+  through the agent path + session tenant isolation; extended per phase)
 - [ ] Seed/demo data exists
-- [x] Docker setup works (Phase 2 — `docker compose up` runs db+backend+frontend; db verified
-  running, backend/frontend verified via host-based dev per `docs/testing.md`)
+- [x] Docker setup works (Phase 2 — `docker compose up` runs db+backend+frontend; Phase 4
+  rebuilds the backend image for the new langgraph/openai dependencies)
 - [ ] Documentation is complete
 - [ ] README is complete
 - [ ] `.env.example` exists

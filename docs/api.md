@@ -136,6 +136,26 @@ Interim role gating — OWNER/ADMIN for every write — until the Phase 5 approv
   partial receipt isn't supported yet. 409 otherwise.
 - `POST /api/purchase-orders/{id}/cancel` — any state except `COMPLETED`. 409 otherwise.
 
+## AI Employee (`app/api/agents.py`)
+
+Agent lifecycle per request: classify (LLM) → route → workflow (registry tools) → verify →
+summarize, all persisted (`agent_sessions`, `agent_tasks`, `agent_actions` per call — FR-14/15).
+The chat endpoint runs synchronously; the response carries both the natural-language reply and a
+structured `result` the frontend renders.
+
+- `POST /api/agent/chat` — any role (writes still gated per tool). Body: `{ "message": str }`.
+  200 → `ChatResponse` (`session_id`, `intent`, `agent_name`, `status`, `reply`, `result`).
+  Status: `COMPLETED` / `FAILED` (e.g. denied role, insufficient stock) /
+  `NEEDS_CLARIFICATION` (unrecognized request).
+- `GET /api/agent/sessions` — any role. Recent 50 sessions for the caller in the active
+  business, newest first.
+- `GET /api/agent/sessions/{id}` — any role. Session detail: tasks + every tool action with
+  risk level and input/result summaries. 404 for another business's session id.
+
+Provider selection: `LLM_PROVIDER` env var (`openai` default with a key; falls back to
+`mock` — deterministic keyword/scripted responses — when no key is set; see
+`docs/decisions.md` ADR-005 and `backend/app/core/llm/`).
+
 ## Planned domains (not yet implemented)
 
-`/api/reports`, `/api/agents`, `/api/approvals`, `/api/audit`, `/api/documents`.
+`/api/reports`, `/api/approvals`, `/api/audit`, `/api/documents`.

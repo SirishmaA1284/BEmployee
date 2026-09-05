@@ -18,7 +18,8 @@ from app.models.supplier_product import SupplierProduct
 from app.models.user import User
 from app.schemas.purchase_order import PurchaseOrderCreate, PurchaseOrderItemRead, PurchaseOrderRead
 from app.security.dependencies import get_current_membership, get_current_user, require_role
-from app.services.pricing import line_total, sum_amounts
+from app.services.errors import BusinessRuleError
+from app.services.purchase_order_service import create_purchase_order as create_po_service
 
 router = APIRouter(prefix="/api/purchase-orders", tags=["purchase-orders"])
 
@@ -67,78 +68,16 @@ async def create_purchase_order(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> PurchaseOrderRead:
-    supplier_result = await db.execute(
-        select(Supplier).where(
-            Supplier.id == payload.supplier_id,
-            Supplier.business_id == membership.business_id,
-            Supplier.deleted_at.is_(None),
+    try:
+        po = await create_po_service(
+            db,
+            business_id=membership.business_id,
+            supplier_id=payload.supplier_id,
+            items=[(line.product_id, line.quantity, line.unit_cost) for line in payload.items],
+            created_by_user_id=current_user.id,
         )
-    )
-    supplier = supplier_result.scalar_one_or_none()
-    if supplier is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Supplier not found")
-    if not supplier.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Cannot create a purchase order against an inactive supplier",
-        )
-
-    items: list[PurchaseOrderItem] = []
-    line_totals = []
-    for line in payload.items:
-        product_result = await db.execute(
-            select(Product).where(
-                Product.id == line.product_id,
-                Product.business_id == membership.business_id,
-                Product.deleted_at.is_(None),
-            )
-        )
-        product = product_result.scalar_one_or_none()
-        if product is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"Product {line.product_id} not found"
-            )
-
-        unit_cost = line.unit_cost
-        if unit_cost is None:
-            sp_result = await db.execute(
-                select(SupplierProduct).where(
-                    SupplierProduct.supplier_id == payload.supplier_id,
-                    SupplierProduct.product_id == line.product_id,
-                )
-            )
-            supplier_product = sp_result.scalar_one_or_none()
-            if supplier_product is None:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"No on-file price for {product.sku} from this supplier — provide unit_cost",
-                )
-            unit_cost = supplier_product.price
-
-        item_total = line_total(line.quantity, unit_cost)
-        line_totals.append(item_total)
-        items.append(
-            PurchaseOrderItem(
-                product_id=line.product_id,
-                quantity=line.quantity,
-                unit_cost=unit_cost,
-                line_total=item_total,
-            )
-        )
-
-    subtotal = sum_amounts(line_totals)
-    po = PurchaseOrder(
-        business_id=membership.business_id,
-        supplier_id=payload.supplier_id,
-        status=PurchaseOrderStatus.DRAFT,
-        subtotal=subtotal,
-        total=subtotal,
-        created_by_user_id=current_user.id,
-        items=items,
-    )
-    db.add(po)
-    await db.commit()
-    await db.refresh(po)
+    except BusinessRuleError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     return await _build_po_read(db, po)
 
 
