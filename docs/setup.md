@@ -60,7 +60,7 @@ See `docs/testing.md`. Short version:
 docker compose up -d db      # ai_employee_test is created automatically by scripts/init-db.sql
 cd backend
 alembic upgrade head                                   # migrate the dev DB
-TEST_DATABASE_URL=postgresql+asyncpg://ai_employee:ai_employee@localhost:5433/ai_employee_test \
+TEST_DATABASE_URL=postgresql+asyncpg://postgres:Chinki@localhost:5433/ai_employee_test \
   alembic upgrade head                                  # migrate the test DB too
 pytest
 ```

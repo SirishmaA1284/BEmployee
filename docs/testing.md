@@ -48,11 +48,11 @@ If host→Docker Postgres connections are flaky (see `docs/troubleshooting.md`),
 through the backend container instead:
 ```bash
 docker compose exec backend pip install -r requirements-dev.txt   # once
-docker compose exec -e TEST_DATABASE_URL="postgresql+asyncpg://ai_employee:ai_employee@db:5432/ai_employee_test" backend python -m pytest -v
+docker compose exec -e TEST_DATABASE_URL="postgresql+asyncpg://postgres:Chinki@db:5432/ai_employee_test" backend python -m pytest -v
 ```
 
 Frontend: no automated tests yet; type-checking and production build (`npm run build`) gate
-every change, and the Phase 4 pages were verified by building. Manual in-browser click-through
+every change, and the Phase 4/5 pages were verified by building. Manual in-browser click-through
 still needs a human pass at http://localhost:5173.
 
 ## Layers (per spec §29)
