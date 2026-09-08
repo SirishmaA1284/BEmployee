@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { to: "/purchase-orders", label: "Purchase Orders" },
   { to: "/approvals", label: "Approvals" },
   { to: "/alerts", label: "Alerts" },
+  { to: "/documents", label: "Documents" },
   { to: "/policies", label: "Policies" },
 ];
 

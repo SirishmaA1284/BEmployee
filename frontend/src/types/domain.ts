@@ -81,3 +81,40 @@ export interface PurchaseOrderRead {
   sent_at: string | null;
   completed_at: string | null;
 }
+
+export interface DocumentRead {
+  id: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  title: string | null;
+  processed_at: string | null;
+  uploaded_by_user_id: string;
+  created_at: string;
+}
+
+export interface DocumentChunkRead {
+  id: string;
+  chunk_index: number;
+  content: string;
+  start_char: number;
+  end_char: number;
+}
+
+export interface DocumentDetail extends DocumentRead {
+  chunk_count: number;
+  chunks: DocumentChunkRead[];
+}
+
+export interface RAGSource {
+  document_id: string;
+  document_name: string;
+  chunk_index: number;
+  similarity: number;
+}
+
+export interface RAGQueryResponse {
+  answer: string;
+  sources: RAGSource[];
+  chunks_used: number;
+}

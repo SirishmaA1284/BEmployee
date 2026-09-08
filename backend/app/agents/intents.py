@@ -30,6 +30,11 @@ Intents:
 - SEARCH_PRODUCTS: the user wants to look up products in the catalog.
 - SEARCH_CUSTOMERS: the user wants to look up a customer.
 - SALES_REPORT: the user asks about sales, revenue or outstanding payments.
+- ASK_DOCUMENTS: the user asks a question that can be answered from the
+  business's uploaded documents (policies, price lists, contracts, notes)
+  ("what does our return policy say", "ask the docs about X"). When the
+  question is about uploaded business documents, prefer this over the other
+  intents.
 - UNKNOWN: anything else — never guess. Pick UNKNOWN when none of the above
   clearly fits."""
 

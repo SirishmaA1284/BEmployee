@@ -5,7 +5,7 @@ system that reads real business data, plans multi-step operational work (orders,
 procurement, reporting), executes what it's authorized to execute, asks a human for approval on
 anything risky, verifies its own results, and leaves a full audit trail.
 
-> **Status:** early build (through Phase 5 — Approval & Policies). This README describes the target
+> **Status:** early build (through Phase 7 — RAG, Documents & MCP). This README describes the target
 > system; sections not yet implemented are marked accordingly. See `CHANGELOG.md` for what has
 > actually shipped, phase by phase. Working today: registration/login, businesses with
 > role-based multi-tenant authorization, full CRUD + business logic for products
@@ -18,9 +18,12 @@ anything risky, verifies its own results, and leaves a full audit trail.
 > action (`agent_sessions`/`agent_tasks`/`agent_actions`). Phase 5 adds the deterministic
 > policy engine (money thresholds escalate risky actions to HIGH), the human approval workflow
 > (HIGH-risk agent actions stop for `approve`/`reject`; purchase orders gate through
-> PENDING_APPROVAL/APPROVED), and a unified audit log. A chat UI and the Orders/Inventory/
-> Suppliers/Purchase Orders/Policies/Approvals pages are live in the frontend. 140 passing tests
-> (`docs/testing.md`). Not yet: proactive intelligence (Phase 6), RAG/MCP (Phase 7), hardening (Phase 8).
+> PENDING_APPROVAL/APPROVED), and a unified audit log. Phase 6 adds a proactive worker
+> (forecasting, low-stock/stockout alerts, daily reports) and notifications. Phase 7 adds
+> document upload → RAG (business-scoped pgvector retrieval, cited answers) and a minimal
+> read-only MCP server. A chat UI and the Orders/Inventory/Suppliers/Purchase
+> Orders/Policies/Approvals/Alerts/Documents pages are live in the frontend. 174 passing tests
+> (`docs/testing.md`). Not yet: hardening & polish (Phase 8).
 
 ## 1. What this is
 
@@ -132,8 +135,8 @@ See [`.env.example`](.env.example). Copy it to `.env` and fill in real values; n
 
 ## 11. Running locally / tests / deployment
 
-[`docs/development.md`](docs/development.md), [`docs/testing.md`](docs/testing.md) (140 backend
-tests passing as of Phase 5), [`docs/deployment.md`](docs/deployment.md) (placeholder — no
+[`docs/development.md`](docs/development.md), [`docs/testing.md`](docs/testing.md) (174 backend
+tests passing as of Phase 7), [`docs/deployment.md`](docs/deployment.md) (placeholder — no
 deployment has been done yet).
 
 ## 12. Demo credentials

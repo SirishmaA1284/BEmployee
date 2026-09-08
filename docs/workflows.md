@@ -111,6 +111,22 @@ re-flagged every tick. Any resulting *action* (e.g. a low-stock-driven purchase 
 flows through the same tool registry / policy / approval pipeline as a user-triggered one — the
 worker never bypasses it.
 
+## Document Q&A (Phase 7, FR-21/22/23)
+
+```mermaid
+flowchart TD
+    Q[User: "what does our policy say?"] --> C[classify -> ASK_DOCUMENTS]
+    C --> E[extract_document_query]
+    E --> R[embed query + pgvector search\nover document_chunks, business-scoped]
+    R --> W[wrap top-k chunks in <business_documents>\nUNTRUSTED reference data]
+    W --> L[LLM reasons: data, never instructions]
+    L --> A[Answer + cited Sources: document name,\nchunk index, similarity]
+```
+
+See `docs/rag.md` for the pipeline and `docs/threat-model.md` T1 for the untrusted-context
+handling. The same path is available over REST (`POST /api/documents/query`) and in chat
+(intent `ASK_DOCUMENTS`).
+
 ## Not yet implemented
 
 Failure-recovery flow (what happens when a workflow fails partway) is documented once multi-step

@@ -10,6 +10,7 @@ from app.models.business import Business
 from app.models.business_member import BusinessMember
 from app.models.business_policy import BusinessPolicy
 from app.models.customer import Customer
+from app.models.document import Document, DocumentChunk
 from app.models.enums import (
     AgentActionStatus,
     AgentIntent,
@@ -63,6 +64,8 @@ __all__ = [
     "StockMovement",
     "StockMovementReason",
     "Customer",
+    "Document",
+    "DocumentChunk",
     "Supplier",
     "SupplierProduct",
     "Order",

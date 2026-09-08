@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     llm_provider: str = "mock"  # openai | anthropic | gemini | mock
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
+    embedding_model: str = "text-embedding-3-small"
 
     # Cap on agent steps per chat request (NFR-3: no unbounded LLM loops).
     max_agent_steps: int = 10

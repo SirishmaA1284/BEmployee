@@ -219,8 +219,37 @@ structured `result` the frontend renders.
 
 Provider selection: `LLM_PROVIDER` env var (`openai` default with a key; falls back to
 `mock` — deterministic keyword/scripted responses — when no key is set; see
-`docs/decisions.md` ADR-005 and `backend/app/core/llm/`).
+`docs/decisions.md` ADR-005 and `backend/app/core/llm/`). `ASK_DOCUMENTS` intent routes to the
+RAG agent workflow (`docs/rag.md`).
+
+## Documents & RAG (`app/api/documents.py`)
+
+Uploaded business documents are chunked and embedded (pgvector) at ingest time; answers cite
+the documents that informed them (FR-21/22/23, `docs/rag.md`).
+
+- `POST /api/documents` — OWNER/ADMIN. `multipart/form-data`: `file` (≤ 2 MiB) and optional
+  `title`. Content-type must be one of `text/plain`, `text/markdown`, `text/csv`,
+  `application/json` (415 otherwise). 201 → `DocumentRead`; chunks are created in the same
+  transaction.
+- `GET /api/documents` — any role. Non-deleted documents for the business, newest first.
+- `GET /api/documents/{id}` — any role. Detail incl. `chunk_count` + `chunks`
+  (content + source spans). 404 for another business's / deleted document.
+- `DELETE /api/documents/{id}` — OWNER/ADMIN. Soft delete (hidden from new retrievals; chunks
+  remain for historical citations). 204.
+- `POST /api/documents/query` — any role. Body: `{ "query": str, "top_k"? }`. Business-scoped
+  RAG retrieval → 200 `RAGQueryResponse` (`answer`, `sources` (document name, chunk index,
+  similarity), `chunks_used`). Retrieved chunks are wrapped as untrusted data before the LLM
+  sees them (FR-23).
+
+## MCP (`app/mcp/server.py`)
+
+Minimal read-only MCP server over JSON-RPC 2.0 (`docs/mcp.md`), ADR-010.
+
+- `POST /mcp` — any authenticated member (same `Authorization` + `X-Business-Id` headers).
+  Methods: `tools/list` (read-only subset of registry schemas) and `tools/call` (executes a
+  read-only tool through the registry, recording an agent session/task/action). Write tools are
+  never exposed.
 
 ## Planned domains (not yet implemented)
 
-`/api/reports`, `/api/documents`.
+`/api/reports`.

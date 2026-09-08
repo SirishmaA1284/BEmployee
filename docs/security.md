@@ -18,8 +18,13 @@ analysis this implements.
 - **CORS:** explicit allow-list of frontend origin(s) via environment configuration.
 - **Secrets management:** environment variables only; `.env.example` documents required keys
   with no real values (spec §36).
-- **File upload validation:** for document uploads (RAG, Phase 7) — content-type allow-list,
-  size limits, virus-scanning noted as a production-hardening item (not MVP-blocking).
+- **File upload validation:** for document uploads (RAG, Phase 7) — content-type allow-list
+  (text/plain, text/markdown, text/csv, application/json) and a 2 MiB size limit, enforced in
+  `backend/app/api/documents.py`. Virus scanning is a production-hardening item (not
+  MVP-blocking).
+- **RAG untrusted content:** retrieved chunks are injected into prompts only inside a delimited
+  `<business_documents>` block labeled as reference data that can never introduce instructions
+  (FR-23, see `docs/threat-model.md` T1).
 - **Prompt injection defenses:** see `docs/threat-model.md` T1.
 - **Tool permission checks:** see `docs/tools.md` and `docs/decisions.md` ADR-003.
 - **Audit logging:** every state-changing action, human or AI, per spec §13/25.

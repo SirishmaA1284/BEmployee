@@ -20,6 +20,7 @@ from app.agents.workflows.finance import build_sales_report_workflow
 from app.agents.workflows.inventory import build_check_inventory_workflow, build_low_stock_workflow
 from app.agents.workflows.order import build_order_workflow
 from app.agents.workflows.procurement import build_compare_suppliers_workflow, build_create_purchase_order_workflow
+from app.agents.workflows.rag import build_rag_workflow
 from app.core.llm.base import LLMProvider
 from app.models.enums import AgentIntent
 
@@ -39,6 +40,7 @@ _INTENT_AGENT = {
     AgentIntent.SEARCH_PRODUCTS: "customer",
     AgentIntent.SEARCH_CUSTOMERS: "customer",
     AgentIntent.SALES_REPORT: "finance",
+    AgentIntent.ASK_DOCUMENTS: "rag",
 }
 
 
@@ -51,6 +53,7 @@ _ROUTED_INTENTS = {
     AgentIntent.SEARCH_PRODUCTS,
     AgentIntent.SEARCH_CUSTOMERS,
     AgentIntent.SALES_REPORT,
+    AgentIntent.ASK_DOCUMENTS,
 }
 
 
@@ -71,6 +74,8 @@ def _workflow_for(intent: AgentIntent, provider: LLMProvider, db: AsyncSession):
         return build_search_customers_workflow(provider, db)
     if intent == AgentIntent.SALES_REPORT:
         return build_sales_report_workflow(provider, db)
+    if intent == AgentIntent.ASK_DOCUMENTS:
+        return build_rag_workflow(provider, db)
     return None
 
 

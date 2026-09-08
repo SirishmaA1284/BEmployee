@@ -10,6 +10,7 @@ from app.api import (
     auth,
     businesses,
     customers,
+    documents,
     inventory,
     invoices,
     notifications,
@@ -20,6 +21,7 @@ from app.api import (
     suppliers,
 )
 from app.core.config import get_settings
+from app.mcp.server import router as mcp_router
 
 settings = get_settings()
 
@@ -66,3 +68,5 @@ app.include_router(policies.router)
 app.include_router(approvals.router)
 app.include_router(audit.router)
 app.include_router(notifications.router)
+app.include_router(documents.router)
+app.include_router(mcp_router)

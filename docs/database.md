@@ -192,9 +192,24 @@ Migration `05beb7c32bed`. `audit_action` gained `NOTIFICATION_SENT`.
   `updated_at`) — read state lives in the frontend, not on the row. Read-only via
   `GET /api/notifications`.
 
+## Phase 7 tables (Documents & RAG — FR-21, ADR-006)
+
+Migration `abf9dcb55aed`. `audit_action` gained `DOCUMENT_UPLOAD`/`DOCUMENT_DELETE`;
+`agent_intent` gained `ASK_DOCUMENTS`.
+
+- **`documents`** — one row per uploaded file: `business_id`, `filename`, `content_type`
+  (checked against an allow-list at upload), `size_bytes` (≤ 2 MiB), `text_content`
+  (extracted plain text the chunks are cut from), `title?`, `processed_at`, `metadata_` (JSONB),
+  `uploaded_by_user_id`, `deleted_at` (soft delete so historical RAG citations stay resolvable —
+  ADR-009).
+- **`document_chunks`** — one row per chunk: `document_id`, `business_id`, `chunk_index`,
+  `content`, `embedding` (pgvector, 1536-dim HNSW-indexed), `start_char`/`end_char` (source
+  spans for citations). Business-scoped retrieval filters on `business_id` — a chunk from
+  another business can never match.
+
 ## Planned tables (not yet implemented)
 
-`documents, document_chunks (pgvector)` — added in Phase 7, each documented here when it ships.
+None for the MVP scope — all planned domains have shipped.
 
 ## Migration workflow
 
@@ -216,6 +231,9 @@ Migrations so far:
   PENDING).
 - `05beb7c32bed` — Phase 6: `notifications` + `notification_type`/`notification_severity`/
   `notification_channel` enums; `audit_action` gains `NOTIFICATION_SENT`.
+- `abf9dcb55aed` — Phase 7: `documents` + `document_chunks` (pgvector, HNSW index);
+  `audit_action` gains `DOCUMENT_UPLOAD`/`DOCUMENT_DELETE`; `agent_intent` gains
+  `ASK_DOCUMENTS`.
 
 Each was generated via `alembic revision --autogenerate` against a real Postgres instance,
 reviewed by hand, and applied before being committed. To migrate the dedicated test database

@@ -212,10 +212,44 @@ No application code yet — this phase is documentation and repository structure
   seasonality/trend); notifications have no read/unread state (read model is the frontend);
   the worker runs in-process (no distributed queue — scaling seam per ADR-007).
 
-### Next: Phase 7 — RAG, Documents & MCP
+### Phase 7 — RAG, Documents & MCP (2026-09-08)
 
-`documents`/`document_chunks` (pgvector) ingestion + retrieval for the AI Employee (FR-21/22/23),
-file-upload validation (security.md), a minimal read-only MCP server (ADR-010, A7), and RAG
-citations in answers.
+- Documents & RAG (FR-21/22/23, ADR-006): `documents` + `document_chunks` (pgvector, HNSW
+  index) models + migration `abf9dcb55aed`. `POST /api/documents` uploads text-based files
+  (content-type allow-list + 2 MiB limit, OWNER/ADMIN) and runs the deterministic pipeline in
+  one transaction: `app/services/chunking.py` (paragraph + word-boundary split with exact
+  source spans), `app/core/llm/embeddings.py` (provider-neutral `EmbeddingProvider` —
+  OpenAI text-embedding-3-small, mock = deterministic hash vectors so tests/CI need no key),
+  `app/rag/retriever.py` (business-scoped pgvector cosine similarity).
+- Cited, grounded answers (`app/rag/answer.py`): retrieved top-k chunks are wrapped in a
+  delimited `<business_documents>` untrusted block before the LLM reasons over them (FR-23,
+  threat-model T1); answers cite source documents (FR-22). Surfaced via `POST
+  /api/documents/query`, the AI Employee chat intent `ASK_DOCUMENTS` (RAG agent workflow,
+  `app/agents/workflows/rag.py`), and the frontend **Documents** page (`/documents` —
+  upload/list/delete + "Ask your documents" with cited sources).
+- Minimal read-only MCP server (`app/mcp/server.py`, ADR-010/A7): JSON-RPC 2.0 over HTTP at
+  `POST /mcp`, same JWT + X-Business-Id auth/business scoping as the REST API. Exposes only a
+  small read-only tool subset (`tools/list`/`tools/call`); calls run through the registry so
+  validation, role checks, and the audit trail all apply; each call records a session/task.
+- Tests: 174 passing total (18 new) — 8 unit (chunking spans/hard-split, mock embedding
+  determinism/dim), 10 integration (upload → chunks, content-type/empty/role validation,
+  list/detail/delete, business-scoped retrieval isolation, RAG query answer + sources, MCP
+  tools/list subset, tools/call through registry, write-tool + bad-auth rejection). Frontend
+  `npm run build` clean.
+- Docs updated: `rag.md` + `mcp.md` filled from placeholders, `api.md` (documents/RAG/MCP),
+  `database.md` (Phase 7 tables + migration), `testing.md`, `security.md` (file-upload
+  validation now implemented), `workflows.md` (document Q&A flow), `agents.md` (RAG workflow),
+  `decisions.md` DoD (RAG, prompt-injection, MCP) + `README.md`, `.env.example`
+  (`EMBEDDING_MODEL`), CHANGELOG.
+- Known limitations carried forward: binary document formats (PDF/DOCX) need extraction tooling
+  (out of MVP scope, docs/security.md); embeddings require an OpenAI key for *real* semantic
+  search (mock is keyword-free deterministic vectors); RAG answers are single-shot (no
+  multi-turn document conversation).
+
+### Next: Phase 8 — Hardening & Polish
+
+Rate limiting on auth/agent endpoints, refresh-token rotation, seed/demo data, frontend
+automated tests, and any remaining security.md roadmap items; re-read docs/threat-model.md
+against what was actually built.
 
 ## [Unreleased]

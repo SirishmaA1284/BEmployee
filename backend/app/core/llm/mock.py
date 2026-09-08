@@ -111,6 +111,18 @@ class MockProvider(LLMProvider):
                 )
             return LLMResponse(content=scripted["content"])
 
+        # RAG grounding: when the messages carry the delimited untrusted
+        # business-documents block (app/rag/answer.py), deterministically
+        # answer with the top chunk verbatim — the same grounded behavior the
+        # real provider produces, minus the LLM.
+        for message in messages:
+            if "<business_documents>" in message.get("content", ""):
+                first_chunk = message["content"].split("<business_documents>")[1].split("</business_documents>")[0]
+                first_chunk = first_chunk.split("\n\n", 1)[0].strip()
+                if first_chunk.startswith("[1] "):
+                    first_chunk = first_chunk[4:]
+                return LLMResponse(content=f"Based on your business documents:\n\n{first_chunk}")
+
         if tools:
             for tool in tools:
                 arguments = _keyword_arguments(tool.name, user_message)
@@ -142,6 +154,8 @@ def _keyword_arguments(tool_name: str, message: str) -> dict[str, Any] | None:
             return {"intent": "CREATE_ORDER", "summary": "Create a customer order"}
         if "sales" in lowered or "report" in lowered or "revenue" in lowered:
             return {"intent": "SALES_REPORT", "summary": "Summarize sales activity"}
+        if "document" in lowered or "policy say" in lowered or "ask the docs" in lowered or "contract" in lowered:
+            return {"intent": "ASK_DOCUMENTS", "summary": "Answer from uploaded business documents"}
         if "product" in lowered and ("search" in lowered or "find" in lowered or "list" in lowered):
             return {"intent": "SEARCH_PRODUCTS", "summary": "Search the product catalog"}
         if "stock" in lowered or "inventory" in lowered or "quantity" in lowered:

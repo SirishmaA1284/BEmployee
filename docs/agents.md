@@ -30,6 +30,7 @@ The orchestrator also enforces NFR-3: a per-request `llm_calls` counter capped a
 | Procurement (`workflows/procurement.py`) | CREATE_PURCHASE_ORDER | extract → plan → create → verify → summarize | search_suppliers, search_products, list_low_stock, compare_supplier_prices, create_purchase_order, list_purchase_orders |
 | Customer (`workflows/customer.py`) | SEARCH_PRODUCTS, SEARCH_CUSTOMERS | extract → search | search_products / search_customers |
 | Finance (`workflows/finance.py`) | SALES_REPORT | report | get_sales_report |
+| RAG (`workflows/rag.py`) | ASK_DOCUMENTS | extract → answer | (retrieval via `app/rag`, not a registry tool) |
 
 Notes:
 
