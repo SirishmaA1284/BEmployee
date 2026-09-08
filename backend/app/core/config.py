@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     jwt_secret: str = "change-me-to-a-long-random-string"
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
+    # Phase 8: rotating refresh token lifetime (docs/security.md).
+    refresh_token_expire_days: int = 30
 
     cors_origins: str = "http://localhost:5173"
 

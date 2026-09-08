@@ -16,9 +16,16 @@ export interface BusinessRead {
 
 export interface TokenResponse {
   access_token: string;
+  refresh_token: string;
   token_type: string;
   user: UserRead;
   businesses: BusinessRead[];
+}
+
+export interface RefreshResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
 }
 
 export interface MeResponse {

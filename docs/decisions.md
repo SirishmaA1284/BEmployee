@@ -295,12 +295,24 @@ and avoids building resumability machinery nothing calls yet (Rule 6 spirit).
 - [x] Security tests exist (Phase 2 — cross-tenant/role-escalation for auth/business; Phase 3 —
   cross-tenant resource isolation for products/orders/purchase-orders; Phase 4 — role denial
   through the agent path + session tenant isolation; extended per phase)
-- [ ] Seed/demo data exists
+- [x] Seed/demo data exists (Phase 8 — `python -m app.seed` creates a demo business: owner,
+  products+inventory (incl. a low-stock item), customers, suppliers, a paid order, a draft PO,
+  and a document for RAG; idempotent)
 - [x] Docker setup works (Phase 2 — `docker compose up` runs db+backend+frontend; Phase 4
   rebuilds the backend image for the new langgraph/openai dependencies; Phase 6 adds the
   `worker` service per ADR-007; Phase 7 adds pgvector to requirements for RAG)
-- [ ] Documentation is complete
-- [ ] README is complete
+- [x] Rate limiting works (Phase 8 — per-IP limits on auth + agent chat endpoints; 429 on
+  overflow; reset per test via `reset_rate_limits`)
+- [x] Refresh-token rotation works (Phase 8 — opaque tokens stored as SHA-256 hashes; `refresh`
+  rotates, `logout` revokes, replay rejected; `refresh_tokens` table)
+- [x] Frontend automated tests + lint exist (Phase 8 — Vitest + Testing Library; ESLint flat
+  config; `npm run lint` and `npm test` pass)
+- [x] Structured logging exists (Phase 8, FR-26 — request IDs on every HTTP request,
+  workflow/session IDs on agent runs, key=value log lines)
+- [x] Documentation is complete (all `docs/*.md` filled in through Phase 8; deployment.md has
+  tested Docker-Compose steps + a documented hosted plan)
+- [x] README is complete (status reflects Phase 8, links to all docs)
 - [x] `.env.example` exists (maintained every phase — LLM provider, scheduler, embedding model,
-  messaging keys, MCP)
-- [ ] Deployment instructions exist
+  messaging keys, MCP, refresh-token expiry)
+- [x] Deployment instructions exist (Phase 8 — docs/deployment.md: local Docker-Compose path
+  verified, hosted plan documented)

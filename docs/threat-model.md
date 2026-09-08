@@ -106,5 +106,20 @@ accidental duplication (see NFR-2 in `docs/requirements.md`).
 
 ## 5. Review Cadence
 
-This document should be re-read at the start of Phase 5 (Approval & Policies) and Phase 7
-(RAG/MCP), and updated whenever a new tool or external integration is added.
+Re-read against the built system at the end of Phase 8 (per the header note) — outcome:
+
+- **T1 (prompt injection):** mitigated — retrieved chunks are wrapped in a delimited
+  `<business_documents>` untrusted block (FR-23, `docs/rag.md`); the tool/policy layer is
+  independent of LLM output (ADR-003).
+- **T2 (malformed tool args):** mitigated — every registry call re-validates arguments against
+  the Pydantic schema (ADR-003), incl. the MCP path.
+- **T3 (approval bypass):** mitigated — HIGH risk always creates an approval request and stops;
+  no code path for an agent to approve its own request (Phase 5).
+- **T4 (cross-tenant):** mitigated — every query is business-scoped server-side; Phase 7
+  verified documents/chunks/MCP isolation by tests.
+- **T5 (privilege escalation):** mitigated — role resolved from `business_members` never
+  client-asserted; rate limiting + rotating refresh tokens (Phase 8) reduce credential abuse.
+- **T6 (runaway loops):** mitigated — per-request step cap (NFR-3); rate limit on
+  `/api/agent/chat` (Phase 8).
+
+This document is re-read whenever a new tool or external integration is added.

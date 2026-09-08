@@ -7,15 +7,17 @@ response carries the natural-language reply plus structured `result` data
 the frontend can render (order summary, low-stock table, rankings, ...).
 """
 
+import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.orchestrator import run_agent
 from app.core.llm.base import LLMProvider
 from app.core.llm.providers import get_llm_provider
+from app.core.logging import get_logger, log_agent_run
 from app.database.base import utcnow
 from app.database.session import get_db
 from app.models.agent import AgentAction, AgentSession, AgentTask
@@ -31,8 +33,11 @@ from app.schemas.agent import (
     ChatResponse,
 )
 from app.security.dependencies import get_current_membership, get_current_user
+from app.security.rate_limit import rate_limit
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
+
+_logger = get_logger("agent")
 
 
 async def _resolve_provider() -> LLMProvider:
@@ -50,10 +55,12 @@ def _session_status(state: dict) -> AgentSessionStatus:
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     payload: ChatRequest,
+    request: Request,
     membership: BusinessMember = Depends(get_current_membership),
     current_user: User = Depends(get_current_user),
     provider: LLMProvider = Depends(_resolve_provider),
     db: AsyncSession = Depends(get_db),
+    _rl: None = Depends(rate_limit(limit=20, window_seconds=60)),
 ) -> ChatResponse:
     session = AgentSession(
         business_id=membership.business_id,
@@ -79,6 +86,18 @@ async def chat(
     )
 
     status_value = _session_status(final_state)
+    log_agent_run(
+        _logger,
+        logging.INFO,
+        "agent run finished",
+        request_id=getattr(request.state, "request_id", None),
+        session_id=session.id,
+        task_id=task.id,
+        intent=final_state.get("intent"),
+        agent_name=final_state.get("agent_name"),
+        status=status_value.value,
+    )
+
     session.intent = final_state.get("intent")
     session.status = status_value
     session.reply = final_state.get("reply")

@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import type { ReactNode } from "react";
 
 import { useAuth } from "../store/AuthContext";
 
@@ -73,7 +74,7 @@ export function NavBar() {
   );
 }
 
-export function PageLayout({ children }: { children: React.ReactNode }) {
+export function PageLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen">
       <NavBar />

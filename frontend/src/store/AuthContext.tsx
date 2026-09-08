@@ -4,10 +4,13 @@ import type { ReactNode } from "react";
 import * as authApi from "../api/auth";
 import {
   clearActiveBusinessId,
+  clearRefreshToken,
   clearToken,
   getStoredActiveBusinessId,
+  getStoredRefreshToken,
   getStoredToken,
   storeActiveBusinessId,
+  storeRefreshToken,
   storeToken,
 } from "../api/client";
 import type { BusinessRead, UserRead } from "../types/auth";
@@ -51,16 +54,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const refresh = useCallback(async () => {
-    if (!getStoredToken()) {
+    const token = getStoredToken();
+    const refresh = getStoredRefreshToken();
+    if (!token && !refresh) {
       setUser(null);
       setBusinesses([]);
       return;
     }
     try {
-      const data = await authApi.me();
-      applySession(data.user, data.businesses);
+      // If the access token is present, refresh the session metadata from it;
+      // otherwise rotate the stored refresh token to get a fresh access token.
+      if (token) {
+        const data = await authApi.me();
+        applySession(data.user, data.businesses);
+      } else if (refresh) {
+        const data = await authApi.refreshToken(refresh);
+        storeToken(data.access_token);
+        storeRefreshToken(data.refresh_token);
+        const me = await authApi.me();
+        applySession(me.user, me.businesses);
+      }
     } catch {
       clearToken();
+      clearRefreshToken();
       clearActiveBusinessId();
       setUser(null);
       setBusinesses([]);
@@ -76,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string) => {
       const data = await authApi.login(email, password);
       storeToken(data.access_token);
+      storeRefreshToken(data.refresh_token);
       applySession(data.user, data.businesses);
     },
     [applySession]
@@ -85,13 +102,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string, fullName: string) => {
       const data = await authApi.register(email, password, fullName);
       storeToken(data.access_token);
+      storeRefreshToken(data.refresh_token);
       applySession(data.user, data.businesses);
     },
     [applySession]
   );
 
   const logout = useCallback(() => {
+    // Best-effort: revoke the refresh token server-side, then clear local state
+    // regardless of the network outcome.
+    const refresh = getStoredRefreshToken();
+    if (refresh) {
+      authApi.logout(refresh).catch(() => undefined);
+    }
     clearToken();
+    clearRefreshToken();
     clearActiveBusinessId();
     setUser(null);
     setBusinesses([]);

@@ -58,8 +58,12 @@ async def _dispose_engine_at_end():
 async def _clean_tables() -> AsyncGenerator[None, None]:
     """Truncates all app tables before every test so tests never depend on
     ordering or leftover state from a previous test. Runs against
-    ai_employee_test only (see TEST_DATABASE_URL above).
+    ai_employee_test only (see TEST_DATABASE_URL above). Also resets the
+    in-memory rate limiter so every test starts with a clean budget.
     """
+    from app.security.rate_limit import reset_rate_limits
+
+    reset_rate_limits()
     async with test_engine.begin() as conn:
         await conn.execute(
             text("TRUNCATE TABLE business_members, businesses, users RESTART IDENTITY CASCADE;")

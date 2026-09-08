@@ -12,21 +12,38 @@ All endpoints below are implemented in `backend/app/api/`. Errors use FastAPI's 
 ### `POST /api/auth/register`
 - Auth: none
 - Body: `{ "email": str, "password": str (min 8 chars), "full_name": str }`
-- 201 → `TokenResponse` (`access_token`, `user`, `businesses: []`)
+- 201 → `TokenResponse` (`access_token`, `refresh_token`, `user`, `businesses: []`)
 - 409 if the email is already registered
 - 422 if the password is shorter than 8 characters (or exceeds bcrypt's 72-byte limit)
+- Rate-limited per IP.
 
 ### `POST /api/auth/login`
 - Auth: none
 - Body: `{ "email": str, "password": str }`
-- 200 → `TokenResponse`
+- 200 → `TokenResponse` (now includes `refresh_token`)
 - 401 for wrong password *or* unknown email (deliberately identical response — no email
   enumeration via the login endpoint)
+- Rate-limited per IP.
 
 ### `GET /api/auth/me`
 - Auth: `Authorization: Bearer <token>`
 - 200 → `{ "user": UserRead, "businesses": BusinessRead[] }`
 - 401 if the token is missing, malformed, expired, or its user no longer exists/is inactive
+
+### `POST /api/auth/refresh` (Phase 8)
+- Auth: none (the refresh token is the credential)
+- Body: `{ "refresh_token": str }`
+- 200 → `RefreshResponse` (`access_token`, `refresh_token`). Rotates the refresh token: the
+  presented one is revoked and a replacement issued, so a replayed/leaked refresh token is
+  rejected on its second use.
+- 401 for an unknown, revoked, or expired refresh token.
+- Rate-limited per IP.
+
+### `POST /api/auth/logout` (Phase 8)
+- Auth: none
+- Body: `{ "refresh_token": str }`
+- 204 — revokes the refresh token (idempotent). The access token remains valid until it
+  expires (short-lived by design).
 
 ## Businesses (`app/api/businesses.py`)
 

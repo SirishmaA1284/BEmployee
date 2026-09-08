@@ -39,6 +39,7 @@ from app.models.payment import Payment
 from app.models.product import Product
 from app.models.purchase_order import PurchaseOrder
 from app.models.purchase_order_item import PurchaseOrderItem
+from app.models.refresh_token import RefreshToken
 from app.models.stock_movement import StockMovement
 from app.models.supplier import Supplier
 from app.models.supplier_product import SupplierProduct
@@ -79,6 +80,7 @@ __all__ = [
     "PurchaseOrder",
     "PurchaseOrderItem",
     "PurchaseOrderStatus",
+    "RefreshToken",
     "AgentSession",
     "AgentTask",
     "AgentAction",

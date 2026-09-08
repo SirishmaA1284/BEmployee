@@ -1,5 +1,22 @@
 import { apiClient } from "./client";
-import type { BusinessMemberRead, BusinessRead, MeResponse, TokenResponse } from "../types/auth";
+import type {
+  BusinessMemberRead,
+  BusinessRead,
+  MeResponse,
+  RefreshResponse,
+  TokenResponse,
+} from "../types/auth";
+
+export async function refreshToken(refreshToken: string) {
+  const { data } = await apiClient.post<RefreshResponse>("/api/auth/refresh", {
+    refresh_token: refreshToken,
+  });
+  return data;
+}
+
+export async function logout(refreshToken: string) {
+  await apiClient.post("/api/auth/logout", { refresh_token: refreshToken });
+}
 
 export async function register(email: string, password: string, fullName: string) {
   const { data } = await apiClient.post<TokenResponse>("/api/auth/register", {

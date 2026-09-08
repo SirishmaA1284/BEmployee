@@ -1,6 +1,7 @@
 import axios from "axios";
 
 const AUTH_TOKEN_KEY = "ai_employee_token";
+const REFRESH_TOKEN_KEY = "ai_employee_refresh_token";
 const ACTIVE_BUSINESS_KEY = "ai_employee_active_business_id";
 
 export const apiClient = axios.create({
@@ -29,6 +30,18 @@ export function storeToken(token: string): void {
 
 export function clearToken(): void {
   localStorage.removeItem(AUTH_TOKEN_KEY);
+}
+
+export function getStoredRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+}
+
+export function storeRefreshToken(token: string): void {
+  localStorage.setItem(REFRESH_TOKEN_KEY, token);
+}
+
+export function clearRefreshToken(): void {
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 export function getStoredActiveBusinessId(): string | null {

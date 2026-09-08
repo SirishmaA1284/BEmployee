@@ -1,9 +1,9 @@
 # Testing Strategy
 
-## Current coverage (through Phase 7)
+## Current coverage (through Phase 8)
 
-174 backend tests, all passing against a real Postgres test database (`ai_employee_test`, see
-`docs/setup.md`):
+181 backend tests, all passing against a real Postgres test database (`ai_employee_test`, see
+`docs/setup.md`). Frontend: 4 Vitest tests, `npm run lint` (ESLint) and `npm run build` clean.
 
 - `tests/unit/` (73): password hashing, JWT, deterministic services — pricing (line totals,
   rounding, tax=0), inventory sufficiency/low-stock math, invoice number formatting,
@@ -16,7 +16,7 @@
   stockout projection, at-risk flags — pure functions, no DB); plus Phase 7: deterministic
   chunking (paragraph split, hard-split, exact source spans) and mock embedding (fixed-dim,
   deterministic, differs per text).
-- `tests/integration/` (83): register/login/me, business creation/membership; product CRUD +
+- `tests/integration/` (90): register/login/me, business creation/membership; product CRUD +
   auto-created inventory + duplicate-SKU rejection; customer CRUD; supplier CRUD + price
   comparison ranking; inventory adjustment (incl. rejecting a negative result); the full order
   flow (stock check → decrement → invoice generation → cancel-restores-stock-and-voids-invoice);
@@ -40,7 +40,9 @@
   another business can never match), RAG query returning a grounded answer + cited sources, and
   the MCP server — `tools/list` exposes only the read-only subset (no writes), `tools/call`
   runs a read tool through the registry with the audit trail, write tools and bad auth are
-  rejected.
+  rejected; plus Phase 8 hardening — refresh-token rotation (issue → rotate → replay rejected →
+  revoke via logout), hashed token storage, and rate limiting (429 on auth/agent endpoints,
+  reset between tests).
 - `tests/agents/` (9): full LangGraph workflows driven by a scripted `MockProvider` against the
   real test database — order end-to-end (extract → resolve → create → verify → summarize),
   unknown-product error path, low-stock, supplier ranking, direct + low-stock-driven purchase
@@ -64,9 +66,10 @@ docker compose exec backend pip install -r requirements-dev.txt   # once
 docker compose exec -e TEST_DATABASE_URL="postgresql+asyncpg://postgres:Chinki@db:5432/ai_employee_test" backend python -m pytest -v
 ```
 
-Frontend: no automated tests yet; type-checking and production build (`npm run build`) gate
-every change, and the Phase 4/5 pages were verified by building. Manual in-browser click-through
-still needs a human pass at http://localhost:5173.
+Frontend (Phase 8): Vitest + Testing Library (4 tests — token storage helpers, AlertsPage
+empty/rendered states), `npm run lint` (ESLint flat config, 0 errors) and `npm run build`
+(type-check + vite) gate every change. Manual in-browser click-through still needs a human pass
+at http://localhost:5173.
 
 ## Layers (per spec §29)
 

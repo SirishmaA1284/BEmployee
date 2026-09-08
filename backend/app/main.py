@@ -21,9 +21,12 @@ from app.api import (
     suppliers,
 )
 from app.core.config import get_settings
+from app.core.logging import configure_logging, get_logger
 from app.mcp.server import router as mcp_router
 
 settings = get_settings()
+configure_logging()
+logger = get_logger("app")
 
 app = FastAPI(
     title="AI Employee Platform API",
@@ -44,6 +47,7 @@ app.add_middleware(
 async def add_request_id(request: Request, call_next):
     request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
     request.state.request_id = request_id
+    logger.info("%s %s", request.method, request.url.path, extra={"request_id": request_id})
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
     return response

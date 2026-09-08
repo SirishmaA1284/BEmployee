@@ -207,6 +207,16 @@ Migration `abf9dcb55aed`. `audit_action` gained `DOCUMENT_UPLOAD`/`DOCUMENT_DELE
   spans for citations). Business-scoped retrieval filters on `business_id` — a chunk from
   another business can never match.
 
+## Phase 8 tables (Refresh tokens — docs/security.md)
+
+Migration `b1244bf28ccb`.
+
+- **`refresh_tokens`** — rotating opaque refresh tokens (Phase 8). `user_id`, `token_hash`
+  (SHA-256 hex of the token — the plaintext is shown only at issue time), `expires_at`
+  (`REFRESH_TOKEN_EXPIRE_DAYS`), `revoked_at?`, `replaced_by_id` (rotation chain for audit),
+  `created_ip?`. Validation requires not-revoked and not-expired; rotation revokes the old row
+  and issues a new one, so a replayed token is rejected.
+
 ## Planned tables (not yet implemented)
 
 None for the MVP scope — all planned domains have shipped.
@@ -234,6 +244,7 @@ Migrations so far:
 - `abf9dcb55aed` — Phase 7: `documents` + `document_chunks` (pgvector, HNSW index);
   `audit_action` gains `DOCUMENT_UPLOAD`/`DOCUMENT_DELETE`; `agent_intent` gains
   `ASK_DOCUMENTS`.
+- `b1244bf28ccb` — Phase 8: `refresh_tokens` (rotating refresh tokens).
 
 Each was generated via `alembic revision --autogenerate` against a real Postgres instance,
 reviewed by hand, and applied before being committed. To migrate the dedicated test database

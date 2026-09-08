@@ -246,10 +246,39 @@ No application code yet — this phase is documentation and repository structure
   search (mock is keyword-free deterministic vectors); RAG answers are single-shot (no
   multi-turn document conversation).
 
-### Next: Phase 8 — Hardening & Polish
+### Phase 8 — Hardening & Polish (2026-09-08)
 
-Rate limiting on auth/agent endpoints, refresh-token rotation, seed/demo data, frontend
-automated tests, and any remaining security.md roadmap items; re-read docs/threat-model.md
-against what was actually built.
+- **Rate limiting** (`app/security/rate_limit.py`): in-process per-IP fixed-window limits on
+  `/api/auth/register`, `/api/auth/login`, `/api/auth/refresh` (10/10/30 per 60s) and
+  `/api/agent/chat` (20 per 60s); 429 on overflow. `reset_rate_limits()` wired into the test
+  conftest so tests start with a clean budget. Per-instance — a distributed limiter is a
+  documented scaling seam.
+- **Refresh-token rotation** (`app/models/refresh_token.py`, `app/services/
+  refresh_token_service.py`, migration `b1244bf28ccb`): opaque tokens stored as SHA-256 hashes
+  only; `POST /api/auth/refresh` validates + rotates (revoke old, issue new) so a replayed/
+  leaked token is rejected on second use; `POST /api/auth/logout` revokes. Register/login now
+  return `refresh_token`; frontend stores it and refreshes/revokes accordingly.
+- **Seed/demo data** (`python -m app.seed`): creates a demo business — owner, 5 products +
+  inventory (incl. a low-stock item the worker/alerts find), 3 customers, 3 suppliers with
+  price links, a paid order + invoice, a draft PO, and a document for RAG. Idempotent.
+- **Frontend lint + tests**: added `eslint.config.js` (flat config, `@typescript-eslint` +
+  react-hooks + browser globals) — `npm run lint` previously failed with no config; now 0
+  errors. Added Vitest + Testing Library (`npm test`): token-storage helpers and AlertsPage
+  render/empty states. `npm run build` clean.
+- **Structured logging (FR-26)**: `app/core/logging.py` — key=value formatter; the http
+  middleware logs every request with `request_id`; agent runs log `session_id`/`task_id`/
+  `intent`/`status`.
+- **Deployment + docs**: `deployment.md` filled in (verified local Docker-Compose path + a
+  documented hosted plan for Postgres/backend+worker/frontend); `security.md` updated (controls
+  now implemented vs. roadmap); `api.md` (refresh/logout + rate limits), `database.md`
+  (`refresh_tokens` + migration), `testing.md` (181 backend + 4 frontend), `decisions.md` DoD
+  (all checked through Phase 8), `threat-model.md` re-read against the built system (T1–T6
+  verified), README + CHANGELOG.
+- Tests: **181 backend** (7 new hardening: rotation/replay/logout/hashed-storage, 429 on
+  register + refresh, reset) + **4 frontend**. Frontend build + lint + test all green.
+
+Phase 8 completes the MVP scope. All `docs/decisions.md` Definition-of-Done items are checked.
+Remaining roadmap (not MVP): distributed rate limiter, virus scanning, WAF/anomaly detection,
+secrets rotation automation, penetration testing, multi-instance hosting (docs/security.md).
 
 ## [Unreleased]
