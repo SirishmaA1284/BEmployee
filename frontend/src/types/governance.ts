@@ -48,7 +48,8 @@ export type AuditAction =
   | "PURCHASE_ORDER_CANCEL"
   | "POLICY_UPSERT"
   | "APPROVAL_DECIDE"
-  | "AGENT_ACTION";
+  | "AGENT_ACTION"
+  | "NOTIFICATION_SENT";
 
 export interface AuditLogRead {
   id: string;
@@ -60,5 +61,26 @@ export interface AuditLogRead {
   summary: string | null;
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export type NotificationType =
+  | "LOW_STOCK"
+  | "FORECASTED_STOCKOUT"
+  | "APPROVAL_PENDING"
+  | "DAILY_REPORT";
+
+export type NotificationSeverity = "INFO" | "WARNING" | "CRITICAL";
+
+export interface NotificationRead {
+  id: string;
+  notification_type: NotificationType;
+  severity: NotificationSeverity;
+  channel: string;
+  title: string;
+  message: string;
+  payload: Record<string, unknown> | null;
+  target_type: string | null;
+  target_id: string | null;
   created_at: string;
 }

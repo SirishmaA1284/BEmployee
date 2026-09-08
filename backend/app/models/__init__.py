@@ -19,6 +19,9 @@ from app.models.enums import (
     AuditAction,
     BusinessRole,
     InvoiceStatus,
+    NotificationChannel,
+    NotificationSeverity,
+    NotificationType,
     OrderStatus,
     PaymentMethod,
     PolicyType,
@@ -28,6 +31,7 @@ from app.models.enums import (
 from app.models.inventory import Inventory
 from app.models.invoice import Invoice
 from app.models.invoice_item import InvoiceItem
+from app.models.notification import Notification
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.payment import Payment
@@ -51,6 +55,10 @@ __all__ = [
     "ApprovalStatus",
     "AuditLog",
     "AuditAction",
+    "Notification",
+    "NotificationType",
+    "NotificationSeverity",
+    "NotificationChannel",
     "Product",
     "StockMovement",
     "StockMovementReason",

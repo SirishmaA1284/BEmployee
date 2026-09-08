@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     # Cap on agent steps per chat request (NFR-3: no unbounded LLM loops).
     max_agent_steps: int = 10
 
+    # --- Phase 6: proactive worker (docs/decisions.md ADR-007) ---
+    scheduler_check_interval_minutes: int = 60
+    scheduler_daily_report_hour: int = 8
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

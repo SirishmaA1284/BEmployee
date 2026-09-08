@@ -189,6 +189,18 @@ REST write and every registry tool call; read-only here.
   `actor_type` (`USER`/`AGENT`), `action`, `target_type`/`target_id`, `summary`, `before`/`after`
   (JSONB snapshots where relevant), `created_at`.
 
+## Notifications (`app/api/notifications.py`)
+
+Proactive alerts created by the scheduler worker and the backend (FR-24, ADR-007). Read-only
+here — creation happens in the worker, never via the API.
+
+- `GET /api/notifications?type_filter=&in_app_only=&limit=` — any role. Latest notifications for
+  the business (max 500), newest first. `type_filter` is one of `LOW_STOCK`/
+  `FORECASTED_STOCKOUT`/`APPROVAL_PENDING`/`DAILY_REPORT`; `in_app_only` defaults to `true` (the
+  MOCK_* channel rows from the A6 messaging mock are hidden by default). Each entry:
+  `notification_type`, `severity` (`INFO`/`WARNING`/`CRITICAL`), `title`, `message`, `payload`
+  (JSON-safe details, e.g. product/forecast values), `target_type`/`target_id`, `created_at`.
+
 ## AI Employee (`app/api/agents.py`)
 
 Agent lifecycle per request: classify (LLM) → route → workflow (registry tools) → verify →

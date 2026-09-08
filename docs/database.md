@@ -173,14 +173,28 @@ Migration `d2e271d74b0f`. Purchase orders gained `PENDING_APPROVAL`/`APPROVED` s
 - **`audit_logs`** — unified, append-only trail of **all** state changes (FR-25): REST writes
   and every registry tool call append a row. `business_id`, `actor_type` (enum: USER, AGENT),
   `actor_user_id?`, `action` (enum: AUDIT_LOG/CREATE/UPDATE/DELETE/AGENT_ACTION/APPROVAL_DECIDE/
-  POLICY_UPSERT/...), `target_type?`/`target_id?`, `summary`, `before`/`after` (JSONB snapshots
-  where relevant), `created_at`. Read-only via `GET /api/audit`; only the backend writes it.
-  Unlike `agent_actions` (agent-path only), this captures human REST changes too.
+  POLICY_UPSERT/NOTIFICATION_SENT/...), `target_type?`/`target_id?`, `summary`, `before`/`after`
+  (JSONB snapshots where relevant), `created_at`. Read-only via `GET /api/audit`; only the
+  backend writes it. Unlike `agent_actions` (agent-path only), this captures human REST changes
+  too.
+
+## Phase 6 tables (Notifications — FR-24, ADR-007)
+
+Migration `05beb7c32bed`. `audit_action` gained `NOTIFICATION_SENT`.
+
+- **`notifications`** — created by the worker (low stock, forecasted stockouts, daily report)
+  and by the backend for events a human should see (pending approvals). `business_id`,
+  `notification_type` (enum: LOW_STOCK, FORECASTED_STOCKOUT, APPROVAL_PENDING, DAILY_REPORT),
+  `severity` (enum: INFO, WARNING, CRITICAL), `channel` (enum: IN_APP, MOCK_WHATSAPP, MOCK_SMS,
+  MOCK_EMAIL — the MOCK channels are the A6 messaging mock, they log the "sent" message and
+  need no real provider credentials), `title`, `message`, `payload` (JSONB, JSON-safe details
+  the UI renders), `target_type?`/`target_id?`, `created_at`. Immutable once created (no
+  `updated_at`) — read state lives in the frontend, not on the row. Read-only via
+  `GET /api/notifications`.
 
 ## Planned tables (not yet implemented)
 
-`documents, document_chunks (pgvector), notifications` — added domain by domain in Phases 6–7,
-each documented here when it ships.
+`documents, document_chunks (pgvector)` — added in Phase 7, each documented here when it ships.
 
 ## Migration workflow
 
@@ -197,6 +211,11 @@ Migrations so far:
   `suppliers`, `supplier_products`, `orders`, `order_items`, `invoices`, `invoice_items`,
   `payments`, `purchase_orders`, `purchase_order_items`.
 - `f2c2e0ac428e` — Phase 4: `agent_sessions`, `agent_tasks`, `agent_actions`.
+- `d2e271d74b0f` — Phase 5: `business_policies`, `approval_requests`, `audit_logs` + enum
+  additions (`purchase_order_status`: PENDING_APPROVAL/APPROVED; `agent_action_status`:
+  PENDING).
+- `05beb7c32bed` — Phase 6: `notifications` + `notification_type`/`notification_severity`/
+  `notification_channel` enums; `audit_action` gains `NOTIFICATION_SENT`.
 
 Each was generated via `alembic revision --autogenerate` against a real Postgres instance,
 reviewed by hand, and applied before being committed. To migrate the dedicated test database

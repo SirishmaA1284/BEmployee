@@ -12,6 +12,7 @@ from app.api import (
     customers,
     inventory,
     invoices,
+    notifications,
     orders,
     policies,
     products,
@@ -64,3 +65,4 @@ app.include_router(agents.router)
 app.include_router(policies.router)
 app.include_router(approvals.router)
 app.include_router(audit.router)
+app.include_router(notifications.router)

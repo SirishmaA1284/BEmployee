@@ -93,8 +93,25 @@ The decision is role-gated by the business's `APPROVAL_ROLES` policy (default OW
 there is no code path for an agent to approve its own request. All REST writes and registry tool
 calls additionally append to the unified `audit_logs` (FR-25).
 
+## Proactive checks (Phase 6, FR-24)
+
+The APScheduler worker (`app/worker/main.py`, ADR-007) runs deterministic checks on a schedule —
+no LLM involvement:
+
+- **Low-stock scan** — flags every product at or below its reorder threshold as a `LOW_STOCK`
+  notification.
+- **Forecasted-stockout scan** — uses `app/services/forecasting.py` (simple moving average over
+  the trailing 14 days of confirmed sales) to project each product's daily demand, days until
+  stockout, and whether it runs out before the fastest supplier lead time; at-risk products
+  become `FORECASTED_STOCKOUT` notifications.
+- **Daily report** — publishes each business's sales summary as a `DAILY_REPORT` notification.
+
+Notifications dedupe per (type, target) within a lookback window so a persistent low stock isn't
+re-flagged every tick. Any resulting *action* (e.g. a low-stock-driven purchase order) still
+flows through the same tool registry / policy / approval pipeline as a user-triggered one — the
+worker never bypasses it.
+
 ## Not yet implemented
 
-Low-stock-driven reordering and demand forecasting land in Phase 6. Failure-recovery flow (what
-happens when a workflow fails partway) is documented once multi-step workflows that aren't
-single DB transactions exist.
+Failure-recovery flow (what happens when a workflow fails partway) is documented once multi-step
+workflows that aren't single DB transactions exist.

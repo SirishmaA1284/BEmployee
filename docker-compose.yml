@@ -1,4 +1,4 @@
-# `docker compose up` starts the full local stack: db, backend API, frontend dev server.
+# `docker compose up` starts the full local stack: db, backend API, worker, frontend dev server.
 # Dev-only default credentials/secrets below are fine for local Docker use; anything
 # deployed uses real secrets from a real .env (see .env.example), never these values.
 services:
@@ -43,6 +43,24 @@ services:
     volumes:
       - ./backend:/app
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    container_name: ai_employee_worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://postgres:Chinki@db:5432/ai_employee
+      JWT_SECRET: dev-only-change-me-this-is-not-a-real-secret-32bytes-plus
+      SCHEDULER_CHECK_INTERVAL_MINUTES: "60"
+      SCHEDULER_DAILY_REPORT_HOUR: "8"
+    volumes:
+      - ./backend:/app
 
   frontend:
     build:

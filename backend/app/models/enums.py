@@ -149,3 +149,35 @@ class AuditAction(str, enum.Enum):
     POLICY_UPSERT = "POLICY_UPSERT"
     APPROVAL_DECIDE = "APPROVAL_DECIDE"
     AGENT_ACTION = "AGENT_ACTION"
+    NOTIFICATION_SENT = "NOTIFICATION_SENT"
+
+
+class NotificationType(str, enum.Enum):
+    """Kinds of notifications the worker / backend create (FR-24, docs/decisions.md
+    ADR-007). `category` drives how the UI groups them; `severity` drives how
+    prominently they are shown. All of these are created by backend logic —
+    never by the LLM.
+    """
+
+    LOW_STOCK = "LOW_STOCK"
+    FORECASTED_STOCKOUT = "FORECASTED_STOCKOUT"
+    APPROVAL_PENDING = "APPROVAL_PENDING"
+    DAILY_REPORT = "DAILY_REPORT"
+
+
+class NotificationSeverity(str, enum.Enum):
+    INFO = "INFO"
+    WARNING = "WARNING"
+    CRITICAL = "CRITICAL"
+
+
+class NotificationChannel(str, enum.Enum):
+    """Delivery channels for a notification. IN_APP is always written; the
+    MOCK channels exist for the messaging mock (docs/decisions.md A6) and
+    simply log the "sent" message — no real provider credentials needed.
+    """
+
+    IN_APP = "IN_APP"
+    MOCK_WHATSAPP = "MOCK_WHATSAPP"
+    MOCK_SMS = "MOCK_SMS"
+    MOCK_EMAIL = "MOCK_EMAIL"

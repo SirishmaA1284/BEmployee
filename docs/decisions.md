@@ -266,12 +266,18 @@ and avoids building resumability machinery nothing calls yet (Rule 6 spirit).
 - [x] Audit logs work (Phase 5 — unified `audit_logs` table for ALL state changes; read via
   `GET /api/audit`; every REST write and every registry tool call records a row)
 - [x] Agent actions are observable (Phase 4 — sessions/tasks/actions API + activity sidebar)
+- [x] Proactive checks work (Phase 6 — APScheduler worker runs deterministic low-stock and
+  forecasted-stockout scans + a daily report per business, FR-24/ADR-007; demand forecasting is
+  deterministic math in `app/services/forecasting.py`, never LLM, FR-13)
+- [x] Notifications work (Phase 6 — `notifications` table + `GET /api/notifications` + Alerts
+  UI; worker findings and pending-approval events become rows; mock messaging adapter per A6)
 - [ ] RAG works for business documents
 - [ ] Prompt-injection defenses exist
 - [x] Multi-tenant authorization works (Phase 2 for auth/business scope, Phase 3 extended to
   every business-owned resource — resource ids from another business 404 under your own
-  membership context; Phase 4 extended to agent sessions; see `backend/tests/security` +
-  `tests/integration/test_agent_chat.py`)
+  membership context; Phase 4 extended to agent sessions; Phase 6 extended to notifications;
+  see `backend/tests/security` + `tests/integration/test_agent_chat.py` +
+  `tests/integration/test_worker_jobs.py`)
 - [x] Unit tests exist (Phase 2 — passwords, JWT; Phase 3 — pricing/inventory/invoicing/
   procurement math; Phase 4 — providers, registry, risk; extended per phase)
 - [x] Integration tests exist (Phase 2 — auth/business flows; Phase 3 — every Core Business
@@ -283,7 +289,8 @@ and avoids building resumability machinery nothing calls yet (Rule 6 spirit).
   through the agent path + session tenant isolation; extended per phase)
 - [ ] Seed/demo data exists
 - [x] Docker setup works (Phase 2 — `docker compose up` runs db+backend+frontend; Phase 4
-  rebuilds the backend image for the new langgraph/openai dependencies)
+  rebuilds the backend image for the new langgraph/openai dependencies; Phase 6 adds the
+  `worker` service per ADR-007)
 - [ ] Documentation is complete
 - [ ] README is complete
 - [ ] `.env.example` exists

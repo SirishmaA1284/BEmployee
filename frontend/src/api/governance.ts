@@ -1,5 +1,11 @@
 import { apiClient } from "./client";
-import type { ApprovalRequestRead, AuditLogRead, PolicyRead, PolicyType } from "../types/governance";
+import type {
+  ApprovalRequestRead,
+  AuditLogRead,
+  NotificationRead,
+  PolicyRead,
+  PolicyType,
+} from "../types/governance";
 
 export async function listPolicies() {
   const { data } = await apiClient.get<PolicyRead[]>("/api/policies");
@@ -38,5 +44,15 @@ export async function decideApproval(
 
 export async function listAuditLogs(limit = 100) {
   const { data } = await apiClient.get<AuditLogRead[]>("/api/audit", { params: { limit } });
+  return data;
+}
+
+export async function listNotifications(typeFilter?: string, limit = 100) {
+  const { data } = await apiClient.get<NotificationRead[]>("/api/notifications", {
+    params: {
+      type_filter: typeFilter || undefined,
+      limit,
+    },
+  });
   return data;
 }

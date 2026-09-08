@@ -1,19 +1,20 @@
 # Testing Strategy
 
-## Current coverage (through Phase 5)
+## Current coverage (through Phase 6)
 
-140 backend tests, all passing against a real Postgres test database (`ai_employee_test`, see
+156 backend tests, all passing against a real Postgres test database (`ai_employee_test`, see
 `docs/setup.md`):
 
-- `tests/unit/` (56): password hashing, JWT, deterministic services — pricing (line totals,
+- `tests/unit/` (65): password hashing, JWT, deterministic services — pricing (line totals,
   rounding, tax=0), inventory sufficiency/low-stock math, invoice number formatting,
   supplier-offer ranking; plus Phase 4: LLM provider interface + MockProvider (scripted and
   keyword rules) + provider factory selection/fallbacks, the tool registry contract
   (validation, role enforcement, structured errors, audit recording, compact JSON-safe
   summaries), and the deterministic risk classifier (read= LOW, writes = MEDIUM, PO gating to
   OWNER/ADMIN); plus Phase 5: the policy engine (money-threshold escalation, approval-roles
-  defaults, projected money impact).
-- `tests/integration/` (66): register/login/me, business creation/membership; product CRUD +
+  defaults, projected money impact); plus Phase 6: forecasting math (moving-average demand,
+  stockout projection, at-risk flags — pure functions, no DB).
+- `tests/integration/` (73): register/login/me, business creation/membership; product CRUD +
   auto-created inventory + duplicate-SKU rejection; customer CRUD; supplier CRUD + price
   comparison ranking; inventory adjustment (incl. rejecting a negative result); the full order
   flow (stock check → decrement → invoice generation → cancel-restores-stock-and-voids-invoice);
@@ -27,7 +28,11 @@
   approval workflow — a money-threshold-escalated PO is created in `PENDING_APPROVAL` with a
   `HIGH` approval request and is **not** sent, approving it transitions the PO to `APPROVED`
   (then sendable), an employee cannot approve a `HIGH` request, and rejecting it leaves the PO
-  `CANCELLED`.
+  `CANCELLED`; plus Phase 6: the worker jobs against seeded rows — low-stock scan creates
+  `LOW_STOCK` notifications and dedupes within the lookback window, healthy products are
+  ignored, the forecasted-stockout scan flags an at-risk product as `CRITICAL` (with real
+  order history seeded), the daily report notification, notifications API filtering +
+  tenant isolation across businesses, and `run_scheduled_checks` covering every business.
 - `tests/agents/` (9): full LangGraph workflows driven by a scripted `MockProvider` against the
   real test database — order end-to-end (extract → resolve → create → verify → summarize),
   unknown-product error path, low-stock, supplier ranking, direct + low-stock-driven purchase

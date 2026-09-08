@@ -179,9 +179,43 @@ No application code yet — this phase is documentation and repository structure
   yet); the audit log has no filtering UI beyond the API; no `notifications` for pending
   approvals (Phase 7).
 
-### Next: Phase 6 — RAG & Documents
+### Phase 6 — Proactive Intelligence (2026-09-08)
 
-`documents`/`document_chunks` (pgvector) ingestion, retrieval for the AI Employee, low-stock-
-driven reordering, and demand forecasting.
+- Deterministic demand forecasting (`app/services/forecasting.py`, FR-13): per-product daily
+  sales series from confirmed orders, simple moving average over the trailing 14 days to
+  project daily demand, and days-until-stockout = ceil(on_hand / projected_daily). At-risk =
+  stockout before the fastest active supplier lead time. Pure Python math — never the LLM;
+  the pure functions are unit-tested without a DB.
+- APScheduler worker (`app/worker/main.py`, ADR-007/A5): a `worker` service (own Docker
+  Compose container, `docker/worker.Dockerfile`) running three deterministic jobs via
+  `app/services/worker_jobs.py` — low-stock scan, forecasted-stockout scan (both
+  `run_scheduled_checks`, every `SCHEDULER_CHECK_INTERVAL_MINUTES`), and a daily report
+  (`SCHEDULER_DAILY_REPORT_HOUR` UTC). Checks run per business; each notification dedupes per
+  (type, target) within a 12h lookback so a persistent issue isn't re-flagged every tick. Any
+  resulting *action* still flows through the policy/approval pipeline — the worker never
+  bypasses it (FR-24).
+- Notifications (FR-24, A6): `notifications` model + migration `05beb7c32bed` (types
+  LOW_STOCK/FORECASTED_STOCKOUT/APPROVAL_PENDING/DAILY_REPORT; severities INFO/WARNING/
+  CRITICAL). `app/services/notification_service.py` writes the IN_APP row always and a
+  MOCK_* channel row for the messaging mock (no real provider credentials). Read-only
+  `GET /api/notifications` (type filter, in-app-only default, tenant-scoped).
+- Frontend: **Alerts page** (`/alerts`) listing notifications with severity styling and a
+  type filter, wired via `src/api/governance.ts` + governance types; added to nav.
+- Tests: 156 passing total (16 new) — 9 unit (forecasting math), 7 integration (worker jobs
+  against seeded rows: low-stock notification + dedupe, healthy products ignored, stockout
+  CRITICAL from real order history, daily report, notifications API filtering + tenant
+  isolation, multi-business `run_scheduled_checks`). Frontend `npm run build` clean.
+- Docs updated: `workflows.md` (proactive checks), `database.md` (notifications table +
+  migration list), `api.md` (notifications endpoint), `testing.md` (new coverage),
+  `.env.example` (scheduler settings), CHANGELOG.
+- Known limitations carried forward: forecasting uses a flat 14-day moving average (no
+  seasonality/trend); notifications have no read/unread state (read model is the frontend);
+  the worker runs in-process (no distributed queue — scaling seam per ADR-007).
+
+### Next: Phase 7 — RAG, Documents & MCP
+
+`documents`/`document_chunks` (pgvector) ingestion + retrieval for the AI Employee (FR-21/22/23),
+file-upload validation (security.md), a minimal read-only MCP server (ADR-010, A7), and RAG
+citations in answers.
 
 ## [Unreleased]
