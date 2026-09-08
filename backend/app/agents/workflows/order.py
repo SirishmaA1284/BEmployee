@@ -117,6 +117,17 @@ def build_order_workflow(provider: LLMProvider, db: AsyncSession):
             "create_order",
             {"customer_id": str(state["customer_id"]), "items": state["resolved_items"]},
         )
+        if result.get("needs_approval"):
+            return {
+                "needs_approval": True,
+                "approval_request_id": result.get("approval_request_id"),
+                "reply": (
+                    f"This order is high-risk and needs a human approval before it can run. "
+                    f"An approval request ({result.get('approval_request_id', '')[:8]}) was created "
+                    "for a manager to review."
+                ),
+                "result": {"needs_approval": True, "approval_request_id": result.get("approval_request_id")},
+            }
         if not result.get("ok"):
             return {"error": f"Order could not be created: {result.get('error')}"}
         return {"created_order_id": result["data"]["order_id"]}

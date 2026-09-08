@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     database_url: str = (
-        "postgresql+asyncpg://ai_employee:ai_employee@localhost:5433/ai_employee"
+        "postgresql+asyncpg://postgres:Chinki@localhost:5433/ai_employee"
     )
 
     jwt_secret: str = "change-me-to-a-long-random-string"

@@ -54,8 +54,10 @@ supplier's on-file prices.
 
 Risk classification is applied structurally on every registry call (`classify_action`,
 `app/policies/risk.py`, ADR-004): reads are LOW, state-changing writes are MEDIUM, and
-`create_purchase_order` is additionally restricted to OWNER/ADMIN. The full policy engine
-(business_policies, thresholds, approval requests) lands in Phase 5 behind the same function.
+`create_purchase_order` is additionally restricted to OWNER/ADMIN. The policy engine
+(`business_policies`, `MONEY_THRESHOLD`, approval requests) ships in `app/policies/policies.py`:
+a MEDIUM money write whose projected impact meets the business's threshold is escalated to HIGH,
+and HIGH always requires human approval before execution.
 
 ## 4. What agents never do
 

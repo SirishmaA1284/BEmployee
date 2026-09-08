@@ -7,8 +7,8 @@ services:
     container_name: ai_employee_db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ai_employee
-      POSTGRES_PASSWORD: ai_employee
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Chinki
       POSTGRES_DB: ai_employee
     ports:
       # Host port 5433 (not 5432) to avoid colliding with any other local Postgres.
@@ -17,7 +17,7 @@ services:
       - ai_employee_db_data:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ai_employee -d ai_employee"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ai_employee"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -33,7 +33,7 @@ services:
         condition: service_healthy
     environment:
       ENVIRONMENT: development
-      DATABASE_URL: postgresql+asyncpg://ai_employee:ai_employee@db:5432/ai_employee
+      DATABASE_URL: postgresql+asyncpg://postgres:Chinki@db:5432/ai_employee
       JWT_SECRET: dev-only-change-me-this-is-not-a-real-secret-32bytes-plus
       JWT_ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: "60"

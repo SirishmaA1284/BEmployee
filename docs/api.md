@@ -122,19 +122,72 @@ Standard CRUD (`POST`/`GET`/`GET {id}`/`PATCH {id}`/`DELETE {id}`), any role can
 
 ## Purchase Orders (`app/api/purchase-orders.py`)
 
-Interim role gating — OWNER/ADMIN for every write — until the Phase 5 approval engine exists
-(see `docs/decisions.md` ADR-015).
+Writes are OWNER/ADMIN (see `docs/decisions.md` ADR-016). Since Phase 5, a purchase order may be
+created directly as `DRAFT`, or — when proposed by the agent and escalated to HIGH risk by the
+policy engine — in `PENDING_APPROVAL`, pending a human decision (`docs/decisions.md` ADR-015).
 
 - `POST /api/purchase-orders` — body: `supplier_id`, `items: [{product_id, quantity,
   unit_cost?}]`. If `unit_cost` is omitted, falls back to the current `supplier_products` price
   for that supplier+product (422 if neither is available). 422 against an inactive supplier.
   Created as `DRAFT`.
 - `GET /api/purchase-orders`, `GET /api/purchase-orders/{id}` — any role.
-- `POST /api/purchase-orders/{id}/send` — `DRAFT → SENT`. 409 otherwise.
+- `POST /api/purchase-orders/{id}/send` — `DRAFT → SENT`, `APPROVED → SENT`. 409 for
+  `PENDING_APPROVAL` (must be decided first) or other states.
 - `POST /api/purchase-orders/{id}/receive` — `SENT → COMPLETED`. Increments inventory and logs
   `StockMovement`s (reason `PURCHASE_RECEIPT`) for every line at its full ordered quantity —
   partial receipt isn't supported yet. 409 otherwise.
 - `POST /api/purchase-orders/{id}/cancel` — any state except `COMPLETED`. 409 otherwise.
+
+Lifecycle: `DRAFT`/`PENDING_APPROVAL → SENT → COMPLETED`. A `PENDING_APPROVAL` PO becomes
+`APPROVED` (or `CANCELLED`) when its approval request is decided — see Approval Requests below.
+
+## Policies (`app/api/policies.py`)
+
+Business policies are stored here and evaluated **deterministically** by `app/policies` (FR-16,
+ADR-004) — the API only stores them; it cannot influence evaluation.
+
+- `GET /api/policies` — any role. Active and inactive policies for the business.
+- `PUT /api/policies/{key}` — OWNER/ADMIN. Body: `{ "policy_type", "key", "value", "description"?,
+  "is_active" }`. Creates or replaces the policy with that key (upsert).
+
+Policy types:
+- `MONEY_THRESHOLD` — `value: { "amount": decimal }`. A MEDIUM-risk money write (create order /
+  create purchase order) whose projected impact ≥ this amount is escalated to HIGH (always
+  requires approval). The smallest active threshold wins.
+- `APPROVAL_ROLES` — `value: { "roles": ["OWNER","ADMIN",...] }`. Which roles may decide
+  approval requests. Defaults to `["OWNER","ADMIN"]` when unset.
+
+Example (po above 500 requires approval):
+```
+PUT /api/policies/po_threshold
+{ "policy_type": "MONEY_THRESHOLD", "key": "po_threshold", "value": { "amount": "500.00" } }
+```
+
+## Approval Requests (`app/api/approvals.py`)
+
+HIGH-risk agent actions (FR-18) create an approval request and **stop before execution**; a
+human resolves it here. The decision is role-gated by the business's APPROVAL_ROLES policy
+(default OWNER/ADMIN). There is no code path for an agent to approve its own request.
+
+- `GET /api/approvals?status_filter=` — any role. Latest 100 requests, newest first.
+  `status_filter` is one of `PENDING`/`APPROVED`/`REJECTED`.
+- `GET /api/approvals/{id}` — any role. 404 if not found / another business's request.
+- `POST /api/approvals/{id}/approve` — role must be in APPROVAL_ROLES. Body: `{ "decision_note"? }`.
+  200 → the request with `status: "APPROVED"`. 403 if the caller's role can't decide; 409 if not
+  `PENDING`.
+- `POST /api/approvals/{id}/reject` — same as approve, sets `status: "REJECTED"`.
+
+For a request targeting a purchase order in `PENDING_APPROVAL`, the decision drives the PO's
+lifecycle: approve → `APPROVED`, reject → `CANCELLED`.
+
+## Audit Log (`app/api/audit.py`)
+
+Unified, append-only audit trail of all state changes (FR-25). Written by the backend on every
+REST write and every registry tool call; read-only here.
+
+- `GET /api/audit?limit=` — any role. Latest entries for the business (max 500). Each entry:
+  `actor_type` (`USER`/`AGENT`), `action`, `target_type`/`target_id`, `summary`, `before`/`after`
+  (JSONB snapshots where relevant), `created_at`.
 
 ## AI Employee (`app/api/agents.py`)
 
@@ -158,4 +211,4 @@ Provider selection: `LLM_PROVIDER` env var (`openai` default with a key; falls b
 
 ## Planned domains (not yet implemented)
 
-`/api/reports`, `/api/approvals`, `/api/audit`, `/api/documents`.
+`/api/reports`, `/api/documents`.

@@ -9,6 +9,8 @@ const NAV_LINKS = [
   { to: "/inventory", label: "Inventory" },
   { to: "/suppliers", label: "Suppliers" },
   { to: "/purchase-orders", label: "Purchase Orders" },
+  { to: "/approvals", label: "Approvals" },
+  { to: "/policies", label: "Policies" },
 ];
 
 export function NavBar() {

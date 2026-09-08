@@ -28,8 +28,15 @@ async def create_purchase_order(
     supplier_id: uuid.UUID,
     items: list[tuple[uuid.UUID, int, uuid.UUID | None]],
     created_by_user_id: uuid.UUID,
+    requires_approval: bool = False,
 ) -> PurchaseOrder:
-    """Creates a DRAFT purchase order.
+    """Creates a purchase order.
+
+    By default it is a DRAFT. When `requires_approval` is True (the policy
+    engine classified the action HIGH), it is created in PENDING_APPROVAL so
+    the FR-9 lifecycle applies: PENDING_APPROVAL -> APPROVED -> SENT. The
+    caller is responsible for creating the corresponding approval request
+    targeting the returned PO.
 
     `items` is a list of (product_id, quantity, unit_cost_or_none) — a None
     unit cost falls back to the supplier's on-file price for that product.
@@ -91,7 +98,7 @@ async def create_purchase_order(
     po = PurchaseOrder(
         business_id=business_id,
         supplier_id=supplier_id,
-        status=PurchaseOrderStatus.DRAFT,
+        status=PurchaseOrderStatus.PENDING_APPROVAL if requires_approval else PurchaseOrderStatus.DRAFT,
         subtotal=subtotal,
         total=subtotal,
         created_by_user_id=created_by_user_id,

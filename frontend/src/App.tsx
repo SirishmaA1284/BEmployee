@@ -1,11 +1,13 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { ApprovalsPage } from "./pages/ApprovalsPage";
 import { ChatPage } from "./pages/ChatPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { InventoryPage } from "./pages/InventoryPage";
 import { LoginPage } from "./pages/LoginPage";
 import { OrdersPage } from "./pages/OrdersPage";
+import { PoliciesPage } from "./pages/PoliciesPage";
 import { PurchaseOrdersPage } from "./pages/PurchaseOrdersPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { SuppliersPage } from "./pages/SuppliersPage";
@@ -61,6 +63,22 @@ export function App() {
         element={
           <ProtectedRoute>
             <PurchaseOrdersPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/approvals"
+        element={
+          <ProtectedRoute>
+            <ApprovalsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/policies"
+        element={
+          <ProtectedRoute>
+            <PoliciesPage />
           </ProtectedRoute>
         }
       />

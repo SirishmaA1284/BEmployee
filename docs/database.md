@@ -149,14 +149,38 @@ cannot call a tool without recording, and cannot record without calling a tool (
 - **`agent_tasks`** — `session_id`, `agent_name` (order/inventory/procurement/customer/finance),
   `status` (RUNNING, COMPLETED, FAILED), `started_at`, `completed_at?`.
 - **`agent_actions`** — `task_id`, `business_id`, `tool_name`, `status` (SUCCESS, FAILED,
-  REJECTED), `risk_level` (LOW/MEDIUM — deterministic, ADR-004), `input_summary` (JSONB,
-  compacted), `result_summary` (JSONB, compacted), `created_by_user_id`, `created_at`. No
-  `updated_at` — an audit row is never edited (same rule as `stock_movements`).
+  REJECTED, PENDING — PENDING added in Phase 5 for an action awaiting human approval),
+  `risk_level` (LOW/MEDIUM/HIGH — deterministic, ADR-004), `input_summary` (JSONB, compacted),
+  `result_summary` (JSONB, compacted), `created_by_user_id`, `created_at`. No `updated_at` — an
+  audit row is never edited (same rule as `stock_movements`).
+
+## Phase 5 tables (Approval, Policies & Audit — FR-16/17/18/25)
+
+Migration `d2e271d74b0f`. Purchase orders gained `PENDING_APPROVAL`/`APPROVED` states and
+`agent_actions` gained `PENDING` (both via `ALTER TYPE ... ADD VALUE`).
+
+- **`business_policies`** — one row per business policy: `business_id`, `policy_type` (enum:
+  MONEY_THRESHOLD, APPROVAL_ROLES), `key` (stable, upsert key), `value` (JSONB, e.g.
+  `{"amount": "500.00"}` or `{"roles": ["OWNER","ADMIN"]}`), `description?`, `is_active`,
+  `updated_by_user_id`. Read/written by the policies API; **evaluated deterministically** by
+  `app/policies/policies.py`, never by the LLM (ADR-004).
+- **`approval_requests`** — a HIGH-risk (or policy-escalated) action awaiting a human decision
+  (FR-18). `business_id`, `action` (tool name), `summary?`, `payload` (JSONB — the proposed
+  action's arguments), `risk_level` (LOW/MEDIUM/HIGH), `target_type?`/`target_id?` (e.g. a
+  `purchase_order` created in `PENDING_APPROVAL`), `status` (enum: PENDING, APPROVED, REJECTED),
+  `requested_by_user_id`, `resolved_by_user_id?`, `resolved_at?`, `decision_note?`. No code path
+  lets an agent (or the requester) approve their own request.
+- **`audit_logs`** — unified, append-only trail of **all** state changes (FR-25): REST writes
+  and every registry tool call append a row. `business_id`, `actor_type` (enum: USER, AGENT),
+  `actor_user_id?`, `action` (enum: AUDIT_LOG/CREATE/UPDATE/DELETE/AGENT_ACTION/APPROVAL_DECIDE/
+  POLICY_UPSERT/...), `target_type?`/`target_id?`, `summary`, `before`/`after` (JSONB snapshots
+  where relevant), `created_at`. Read-only via `GET /api/audit`; only the backend writes it.
+  Unlike `agent_actions` (agent-path only), this captures human REST changes too.
 
 ## Planned tables (not yet implemented)
 
-`business_policies, documents, document_chunks (pgvector), approval_requests, audit_logs,
-notifications` — added domain by domain in Phases 5–7, each documented here when it ships.
+`documents, document_chunks (pgvector), notifications` — added domain by domain in Phases 6–7,
+each documented here when it ships.
 
 ## Migration workflow
 

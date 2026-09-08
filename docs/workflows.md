@@ -70,9 +70,31 @@ creating a purchase order is its own read-only endpoint — see `docs/api.md` �
 suppliers by price then lead time via `app/services/procurement.py`, the same function Phase
 4's Procurement Agent will call.
 
+## Approval-gated purchase order (Phase 5, FR-9/FR-18)
+
+When the Procurement Agent proposes a purchase order that the policy engine classifies **HIGH**
+(a `MONEY_THRESHOLD` policy is exceeded), the tool registry does **not** execute it directly.
+Instead it creates the PO in `PENDING_APPROVAL` and opens an `approval_requests` row targeting
+it; the agent stops and reports that a human decision is needed. A human then resolves it via
+the approvals API, which drives the PO's lifecycle:
+
+```mermaid
+flowchart TD
+    A[Agent proposes PO,\npolicy says HIGH] --> B[Registry creates PO:\nPENDING_APPROVAL +\nopens approval request]
+    B --> C["POST /api/approvals/{id}/approve"]
+    B --> D["POST /api/approvals/{id}/reject"]
+    C --> E["PO -> APPROVED"]
+    D --> F["PO -> CANCELLED"]
+    E --> G["POST /send: APPROVED -> SENT"]
+    G --> H["POST /receive: SENT -> COMPLETED"]
+```
+
+The decision is role-gated by the business's `APPROVAL_ROLES` policy (default OWNER/ADMIN);
+there is no code path for an agent to approve its own request. All REST writes and registry tool
+calls additionally append to the unified `audit_logs` (FR-25).
+
 ## Not yet implemented
 
-Low-stock detection, demand forecasting, and the approval-gated purchase-order flow (FR-9's
-`PENDING_APPROVAL`/`APPROVED` states) land in Phases 5–6. Failure-recovery flow (what happens
-when a workflow fails partway) is documented once the agent orchestrator (Phase 4) introduces
-multi-step workflows that aren't single DB transactions.
+Low-stock-driven reordering and demand forecasting land in Phase 6. Failure-recovery flow (what
+happens when a workflow fails partway) is documented once multi-step workflows that aren't
+single DB transactions exist.

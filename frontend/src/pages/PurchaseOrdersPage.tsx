@@ -60,7 +60,8 @@ export function PurchaseOrdersPage() {
     <PageLayout>
       <h1 className="text-lg font-semibold">Purchase Orders</h1>
       <p className="text-sm text-slate-500">
-        Draft → send → receive. Receiving a PO brings the ordered quantities into inventory.
+        Draft → approve → send → receive. Receiving a PO brings the ordered quantities into inventory.
+        Purchase orders above a configured threshold wait in PENDING_APPROVAL for a human decision.
       </p>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4">
@@ -153,7 +154,12 @@ export function PurchaseOrdersPage() {
                 <span className="font-medium">{po.supplier_name}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-500">{po.total} · {po.status}</span>
-                  {po.status === "DRAFT" && (
+                  {po.status === "PENDING_APPROVAL" && (
+                    <span className="rounded bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">
+                      Awaiting approval
+                    </span>
+                  )}
+                  {(po.status === "DRAFT" || po.status === "APPROVED") && (
                     <button
                       onClick={() => sendMutation.mutate(po.id)}
                       className="rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"

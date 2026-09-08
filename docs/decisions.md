@@ -161,17 +161,20 @@ better to spend that effort once Phase 4 needs real data to display AI actions a
 **Why:** Matches Rule 4 (deterministic backend calculation, never LLM) and avoids building tax/
 partial-invoicing machinery nobody has asked for yet (no premature abstraction).
 
-## ADR-015: Purchase orders implement only the non-approval lifecycle in Phase 3
+## ADR-015: Purchase order approval lifecycle lands in Phase 5, not Phase 3
 
-**Decision:** `PurchaseOrderStatus` for Phase 3 is `DRAFT → SENT → COMPLETED`, plus
-`CANCELLED`. The `PENDING_APPROVAL`/`APPROVED` states from FR-9 are added as an enum + workflow
-change in Phase 5 when the policy/approval engine exists to actually gate them. Until then,
-creating and sending a purchase order is restricted to `OWNER`/`ADMIN` roles (interim
-safeguard, not a substitute for the real approval gate) rather than left open to `EMPLOYEE`.
+**Decision:** `PurchaseOrderStatus` in Phase 3 was `DRAFT → SENT → COMPLETED` plus `CANCELLED`;
+creating/sending a PO was restricted to `OWNER`/`ADMIN` as an interim safeguard. **Phase 5**
+added the FR-9 `PENDING_APPROVAL`/`APPROVED` states (enum values + workflow branches, migration
+`d2e271d74b0f`). A PO proposed by the agent at HIGH risk (policy-escalated) is created in
+`PENDING_APPROVAL` with an attached `approval_requests` row; a human decision transitions it to
+`APPROVED`/`CANCELLED`. Direct REST creation still starts `DRAFT` (the approval gate is applied
+by the agent/tool path, ADR-003).
 
 **Why:** Adding unused enum states/workflow branches before the approval engine exists to drive
-them would be dead code (Rule 6 spirit — don't build machinery nothing calls yet); this is
-tracked explicitly here so Phase 5 knows to revisit both the enum and the role restriction.
+them would be dead code (Rule 6 spirit); the interim role restriction kept employees from
+creating POs until the real gate shipped, and the decision was tracked here for Phase 5 to
+revisit — which it now has.
 
 ## ADR-016: Role gating for Phase 3 write operations
 
@@ -254,10 +257,14 @@ and avoids building resumability machinery nothing calls yet (Rule 6 spirit).
 - [x] Agent can compare suppliers (Phase 4 — same deterministic ranking as the REST endpoint)
 - [x] Agent can prepare purchase orders (Phase 4 — direct and low-stock-driven; OWNER/ADMIN
   gated via the tool registry)
-- [ ] Approval workflow works
-- [ ] Policies work
-- [ ] Audit logs work (agent_actions audit trail exists from Phase 4; the unified
-  `audit_logs` table for ALL state changes lands in Phase 5)
+- [x] Approval workflow works (Phase 5 — HIGH-risk agent actions create an approval request and
+  stop before execution; `POST /api/approvals/{id}/approve|reject` resolves it, role-gated by the
+  business's APPROVAL_ROLES policy, default OWNER/ADMIN; PO approval drives the FR-9 lifecycle)
+- [x] Policies work (Phase 5 — `business_policies` rows evaluated deterministically by
+  `app/policies`; MONEY_THRESHOLD escalates MEDIUM money writes to HIGH; APPROVAL_ROLES
+  configures who may decide; `GET/PUT /api/policies`)
+- [x] Audit logs work (Phase 5 — unified `audit_logs` table for ALL state changes; read via
+  `GET /api/audit`; every REST write and every registry tool call records a row)
 - [x] Agent actions are observable (Phase 4 — sessions/tasks/actions API + activity sidebar)
 - [ ] RAG works for business documents
 - [ ] Prompt-injection defenses exist

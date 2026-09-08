@@ -73,7 +73,7 @@ export interface PurchaseOrderRead {
   id: string;
   supplier_id: string;
   supplier_name: string;
-  status: "DRAFT" | "SENT" | "COMPLETED" | "CANCELLED";
+  status: "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "SENT" | "COMPLETED" | "CANCELLED";
   subtotal: string;
   total: string;
   items: OrderItemRead[];

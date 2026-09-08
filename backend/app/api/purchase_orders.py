@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.base import utcnow
 from app.database.session import get_db
 from app.models.business_member import BusinessMember
-from app.models.enums import BusinessRole, PurchaseOrderStatus, StockMovementReason
+from app.models.enums import AuditAction, BusinessRole, PurchaseOrderStatus, StockMovementReason
 from app.models.inventory import Inventory
 from app.models.product import Product
 from app.models.purchase_order import PurchaseOrder
@@ -18,6 +18,7 @@ from app.models.supplier_product import SupplierProduct
 from app.models.user import User
 from app.schemas.purchase_order import PurchaseOrderCreate, PurchaseOrderItemRead, PurchaseOrderRead
 from app.security.dependencies import get_current_membership, get_current_user, require_role
+from app.services.audit_service import record_audit
 from app.services.errors import BusinessRuleError
 from app.services.purchase_order_service import create_purchase_order as create_po_service
 
@@ -78,6 +79,18 @@ async def create_purchase_order(
         )
     except BusinessRuleError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    await record_audit(
+        db,
+        business_id=membership.business_id,
+        actor_type="USER",
+        actor_user_id=current_user.id,
+        action=AuditAction.PURCHASE_ORDER_CREATE,
+        target_type="purchase_order",
+        target_id=po.id,
+        summary=f"Created purchase order with status {po.status.value}",
+        after={"status": po.status.value, "total": str(po.total)},
+    )
+    await db.commit()
     return await _build_po_read(db, po)
 
 
@@ -123,13 +136,26 @@ async def send_purchase_order(
     db: AsyncSession = Depends(get_db),
 ) -> PurchaseOrderRead:
     po = await _get_po_or_404(db, membership.business_id, po_id)
-    if po.status != PurchaseOrderStatus.DRAFT:
+    # A PO can be sent from DRAFT (no approval required) or from APPROVED
+    # (a PENDING_APPROVAL PO whose human approval was granted — FR-9).
+    if po.status not in (PurchaseOrderStatus.DRAFT, PurchaseOrderStatus.APPROVED):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Cannot send a purchase order in status {po.status.value}",
         )
     po.status = PurchaseOrderStatus.SENT
     po.sent_at = utcnow()
+    await record_audit(
+        db,
+        business_id=membership.business_id,
+        actor_type="USER",
+        actor_user_id=membership.user_id,
+        action=AuditAction.PURCHASE_ORDER_SEND,
+        target_type="purchase_order",
+        target_id=po.id,
+        summary="Sent purchase order",
+        after={"status": po.status.value},
+    )
     await db.commit()
     await db.refresh(po)
     return await _build_po_read(db, po)
@@ -178,6 +204,17 @@ async def receive_purchase_order(
 
     po.status = PurchaseOrderStatus.COMPLETED
     po.completed_at = utcnow()
+    await record_audit(
+        db,
+        business_id=membership.business_id,
+        actor_type="USER",
+        actor_user_id=current_user.id,
+        action=AuditAction.PURCHASE_ORDER_RECEIVE,
+        target_type="purchase_order",
+        target_id=po.id,
+        summary="Received purchase order into inventory",
+        after={"status": po.status.value},
+    )
     await db.commit()
     await db.refresh(po)
     return await _build_po_read(db, po)
@@ -197,6 +234,17 @@ async def cancel_purchase_order(
     if po.status == PurchaseOrderStatus.CANCELLED:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already cancelled")
     po.status = PurchaseOrderStatus.CANCELLED
+    await record_audit(
+        db,
+        business_id=membership.business_id,
+        actor_type="USER",
+        actor_user_id=membership.user_id,
+        action=AuditAction.PURCHASE_ORDER_CANCEL,
+        target_type="purchase_order",
+        target_id=po.id,
+        summary="Cancelled purchase order",
+        after={"status": po.status.value},
+    )
     await db.commit()
     await db.refresh(po)
     return await _build_po_read(db, po)

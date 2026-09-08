@@ -37,7 +37,7 @@ export interface AgentSessionSummary {
 export interface AgentActionRead {
   id: string;
   tool_name: string;
-  status: "SUCCESS" | "FAILED" | "REJECTED";
+  status: "SUCCESS" | "FAILED" | "REJECTED" | "PENDING";
   risk_level: "LOW" | "MEDIUM" | "HIGH";
   input_summary: Record<string, unknown>;
   result_summary: Record<string, unknown>;

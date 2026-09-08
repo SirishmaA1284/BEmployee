@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Separate database for the automated test suite (backend/tests), so tests
 -- never run against dev data.
-CREATE DATABASE ai_employee_test OWNER ai_employee;
+CREATE DATABASE ai_employee_test OWNER postgres;
 
 \c ai_employee_test
 CREATE EXTENSION IF NOT EXISTS vector;

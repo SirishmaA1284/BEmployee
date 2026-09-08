@@ -19,7 +19,7 @@ if sys.platform == "win32":
 # can never touch real data. Overridable via TEST_DATABASE_URL for CI.
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://ai_employee:ai_employee@localhost:5433/ai_employee_test",
+    "postgresql+asyncpg://postgres:Chinki@localhost:5433/ai_employee_test",
 )
 
 test_engine = create_async_engine(TEST_DATABASE_URL, pool_pre_ping=True)

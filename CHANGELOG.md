@@ -140,10 +140,48 @@ No application code yet — this phase is documentation and repository structure
   the policy engine (thresholds, approval requests) is Phase 5 (ADR-004 seam); no frontend
   automated tests yet.
 
-### Next: Phase 5 — Approval & Policies
+### Phase 5 — Approval & Policies (2026-09-08)
 
-Policy engine (`business_policies`), risk classification with real thresholds, approval
-requests + UI, unified `audit_logs`, purchase orders gaining their PENDING_APPROVAL/APPROVED
-states (ADR-015).
+- Policy engine (`app/policies/`, FR-16/FR-17, ADR-004): `business_policies` rows are stored via
+  the API but evaluated **deterministically** in plain Python (`app/policies/policies.py`) —
+  never by the LLM. `MONEY_THRESHOLD` computes the *projected* money impact of a proposed
+  create-order / create-purchase-order write and escalates MEDIUM → HIGH when it meets the
+  (smallest active) threshold; `APPROVAL_ROLES` configures which roles may decide approval
+  requests (default OWNER/ADMIN). `evaluate_risk` is what the tool registry and approval
+  pipeline actually call; `classify_action` remains the pure Phase 4 classifier.
+- Approval workflow (FR-18): the tool registry stops HIGH-risk agent actions before execution
+  and opens an `approval_requests` row (payload = the proposed arguments, never chain-of-
+  thought). `POST /api/approvals/{id}/approve|reject` is the human decision path, role-gated by
+  `APPROVAL_ROLES`. There is no code path for an agent (or the requester) to approve its own
+  request. Purchase orders proposed at HIGH are created in `PENDING_APPROVAL` with the request
+  targeting them; deciding transitions the PO to `APPROVED`/`CANCELLED` (FR-9, ADR-015).
+- Unified audit log (FR-25): `audit_logs` table captures **all** state changes — every REST
+  write (auth, businesses, policies, approvals) and every registry tool call appends a row via
+  `app/services/audit_service.py`; read-only `GET /api/audit` for any member. Complements (does
+  not replace) the agent-path `agent_actions` trail.
+- API: `GET/PUT /api/policies`, `GET /api/approvals[/{id}]`, `POST .../approve|reject`,
+  `GET /api/audit`. Purchase orders gained `PENDING_APPROVAL`/`APPROVED` states; a
+  `PENDING_APPROVAL` PO cannot be sent until decided.
+- Models/migration: `business_policies`, `approval_requests`, `audit_logs` + enum additions
+  (`purchase_order_status`: PENDING_APPROVAL/APPROVED; `agent_action_status`: PENDING) in
+  migration `d2e271d74b0f`.
+- Frontend: Policies page (upsert/enable MONEY_THRESHOLD and APPROVAL_ROLES), Approvals page
+  (list + approve/reject with decision note, PENDING badge), PO pages reflect the new states.
+  Wired via `src/api/governance.ts` + `src/types/governance.ts`.
+- Tests: 140 passing total (15 new) — 6 unit (policy engine: threshold escalation, money-impact
+  projection, approval-role defaults), 9 integration (policies API CRUD/role gating; approval
+  workflow: HIGH-risk PO parked PENDING_APPROVAL + not sendable, approve → APPROVED → sendable,
+  employee cannot approve HIGH, reject → PO CANCELLED). Frontend `npm run build` clean.
+- Docs updated: `api.md` (policies/approvals/audit endpoints + PO states), `database.md`
+  (Phase 5 tables + enum additions), `testing.md` (new coverage), `workflows.md` (approval-
+  gated PO flow), `agents.md` (policy engine no longer future), `decisions.md` DoD checklist.
+- Known limitations carried forward: approval is request-level (no multi-stage/chained approval
+  yet); the audit log has no filtering UI beyond the API; no `notifications` for pending
+  approvals (Phase 7).
+
+### Next: Phase 6 — RAG & Documents
+
+`documents`/`document_chunks` (pgvector) ingestion, retrieval for the AI Employee, low-stock-
+driven reordering, and demand forecasting.
 
 ## [Unreleased]

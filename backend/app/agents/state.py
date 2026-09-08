@@ -46,6 +46,12 @@ class AgentState(TypedDict, total=False):
     plan_narration: list[str]
     created_po_id: uuid.UUID
 
+    # Approval gating (Phase 5, FR-18): set when a tool call returned
+    # `needs_approval` because the policy engine classified the action HIGH.
+    # The workflow stops before execution and surfaces the request to the user.
+    needs_approval: bool
+    approval_request_id: uuid.UUID
+
     # Output.
     reply: str
     result: dict[str, Any]

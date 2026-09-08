@@ -18,9 +18,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.llm.base import ToolCallRequest
 from app.models.agent import AgentAction
-from app.models.enums import AgentActionStatus, BusinessRole
-from app.policies.risk import RiskLevel, classify_action
+from app.models.approval import ApprovalRequest
+from app.models.enums import (
+    AgentActionStatus,
+    ApprovalStatus,
+    AuditAction,
+    BusinessRole,
+)
+from app.policies.policies import evaluate_risk
+from app.policies.risk import RiskLevel
+from app.services.audit_service import record_audit
 from app.services.errors import BusinessRuleError
+from app.services.purchase_order_service import create_purchase_order as create_po_service
 from app.tools.base import ToolError, ToolSpec
 
 _MAX_SUMMARY_CHARS = 600
@@ -29,12 +38,19 @@ _MAX_SUMMARY_ITEMS = 25
 
 def _json_safe(value: Any) -> Any:
     """Converts non-JSON values (UUID, Decimal, datetime, enums) to their
-    JSON-safe string form so action summaries can always be stored in JSONB.
+    JSON-safe string form so action summaries and approval payloads can
+    always be stored in JSONB. Recurses into dicts and lists.
     """
     if isinstance(value, (uuid.UUID, Decimal, datetime)):
         return str(value)
     if isinstance(value, BaseModel):
         return _json_safe(value.model_dump())
+    if isinstance(value, dict):
+        return {k: _json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(v) for v in value]
+    if isinstance(value, tuple):
+        return [_json_safe(v) for v in value]
     return value
 
 
@@ -113,7 +129,80 @@ class ToolRegistry:
                 "error": f"Tool {name} requires role {'/'.join(r.value for r in tool.required_roles)}",
             }
 
-        risk_level = classify_action(tool, arguments)
+        risk_level = await evaluate_risk(db, business_id, tool, arguments)
+
+        # HIGH risk always requires human approval (FR-18). Purchase orders
+        # follow the FR-9 lifecycle: they are created in PENDING_APPROVAL and
+        # an approval request is attached targeting the created PO; other
+        # HIGH-risk tools are stopped before execution. Either way there is
+        # no code path for an agent to approve its own request.
+        if risk_level == RiskLevel.HIGH:
+            target_type: str | None = None
+            target_id: uuid.UUID | None = None
+            data: dict[str, Any] = {}
+            if name == "create_purchase_order":
+                try:
+                    po = await create_po_service(
+                        db,
+                        business_id=business_id,
+                        supplier_id=validated.supplier_id,
+                        items=[(i.product_id, i.quantity, i.unit_cost) for i in validated.items],
+                        created_by_user_id=user_id,
+                        requires_approval=True,
+                    )
+                except BusinessRuleError as exc:
+                    db.add(
+                        AgentAction(
+                            task_id=task_id,
+                            business_id=business_id,
+                            tool_name=name,
+                            status=AgentActionStatus.FAILED,
+                            risk_level=risk_level.value,
+                            input_summary=_compact(validated.model_dump()),
+                            result_summary={"error": str(exc.detail)},
+                            created_by_user_id=user_id,
+                        )
+                    )
+                    return {"ok": False, "error": exc.detail}
+                target_type = "purchase_order"
+                target_id = po.id
+                data = {"purchase_order_id": str(po.id), "status": po.status.value}
+
+            approval = ApprovalRequest(
+                business_id=business_id,
+                action=name,
+                summary=f"Agent proposed '{name}' with risk {risk_level.value}.",
+                payload=_json_safe(validated.model_dump()),
+                risk_level=risk_level.value,
+                requested_by_user_id=user_id,
+                target_type=target_type,
+                target_id=target_id,
+            )
+            db.add(approval)
+            await db.flush()
+            db.add(
+                AgentAction(
+                    task_id=task_id,
+                    business_id=business_id,
+                    tool_name=name,
+                    status=AgentActionStatus.PENDING,
+                    risk_level=risk_level.value,
+                    input_summary=_compact(validated.model_dump()),
+                    result_summary=_compact({"needs_approval": True, **data}),
+                    created_by_user_id=user_id,
+                )
+            )
+            await db.commit()
+            return {
+                "ok": False,
+                "needs_approval": True,
+                "approval_request_id": str(approval.id),
+                "data": data,
+                "error": (
+                    f"This action is high-risk and needs a human approval before it can run. "
+                    f"Approval request {str(approval.id)[:8]} was created."
+                ),
+            }
 
         try:
             data = await tool.handler(db, business_id, user_id, validated)
@@ -148,6 +237,16 @@ class ToolRegistry:
                 result_summary=_compact(json.loads(json.dumps(data, default=str))),
                 created_by_user_id=user_id,
             )
+        )
+        await record_audit(
+            db,
+            business_id=business_id,
+            actor_type="AGENT",
+            actor_user_id=user_id,
+            action=AuditAction.AGENT_ACTION,
+            target_type=name,
+            summary=(tool.action_summary or f"Agent executed {name}"),
+            after=_compact(data),
         )
         return {"ok": True, "data": data}
 

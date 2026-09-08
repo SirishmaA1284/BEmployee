@@ -5,12 +5,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (
     agents,
+    approvals,
+    audit,
     auth,
     businesses,
     customers,
     inventory,
     invoices,
     orders,
+    policies,
     products,
     purchase_orders,
     suppliers,
@@ -58,3 +61,6 @@ app.include_router(orders.router)
 app.include_router(invoices.router)
 app.include_router(purchase_orders.router)
 app.include_router(agents.router)
+app.include_router(policies.router)
+app.include_router(approvals.router)
+app.include_router(audit.router)

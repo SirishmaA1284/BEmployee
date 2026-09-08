@@ -4,18 +4,24 @@ SQLAlchemy's mapper configuration see the full schema from a single import.
 
 from app.database.base import Base
 from app.models.agent import AgentAction, AgentSession, AgentTask
+from app.models.approval import ApprovalRequest
+from app.models.audit import AuditLog
 from app.models.business import Business
 from app.models.business_member import BusinessMember
+from app.models.business_policy import BusinessPolicy
 from app.models.customer import Customer
 from app.models.enums import (
     AgentActionStatus,
     AgentIntent,
     AgentSessionStatus,
     AgentTaskStatus,
+    ApprovalStatus,
+    AuditAction,
     BusinessRole,
     InvoiceStatus,
     OrderStatus,
     PaymentMethod,
+    PolicyType,
     PurchaseOrderStatus,
     StockMovementReason,
 )
@@ -39,8 +45,13 @@ __all__ = [
     "Business",
     "BusinessMember",
     "BusinessRole",
+    "BusinessPolicy",
+    "PolicyType",
+    "ApprovalRequest",
+    "ApprovalStatus",
+    "AuditLog",
+    "AuditAction",
     "Product",
-    "Inventory",
     "StockMovement",
     "StockMovementReason",
     "Customer",

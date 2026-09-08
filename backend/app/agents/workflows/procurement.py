@@ -249,6 +249,17 @@ def build_create_purchase_order_workflow(provider: LLMProvider, db: AsyncSession
                 "items": [{"product_id": item["product_id"], "quantity": item["quantity"]} for item in state["plan_items"]],
             },
         )
+        if result.get("needs_approval"):
+            return {
+                "needs_approval": True,
+                "approval_request_id": result.get("approval_request_id"),
+                "reply": (
+                    f"This purchase order is high-risk and needs a human approval before it can "
+                    f"be placed. An approval request ({result.get('approval_request_id', '')[:8]}) "
+                    "was created for a manager to review."
+                ),
+                "result": {"needs_approval": True, "approval_request_id": result.get("approval_request_id")},
+            }
         if not result.get("ok"):
             return {"error": f"Purchase order could not be created: {result.get('error')}"}
         return {"created_po_id": result["data"]["purchase_order_id"]}

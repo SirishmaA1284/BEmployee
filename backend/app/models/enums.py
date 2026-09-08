@@ -40,14 +40,18 @@ class PaymentMethod(str, enum.Enum):
 
 
 class PurchaseOrderStatus(str, enum.Enum):
-    """DRAFT -> SENT -> COMPLETED, or CANCELLED at any point before COMPLETED.
+    """Full FR-9 lifecycle (Phase 5, ADR-015):
 
-    PENDING_APPROVAL/APPROVED (spec FR-9) are added in Phase 5 alongside the
-    policy/approval engine that actually gates them — see docs/decisions.md
-    ADR-015.
+    DRAFT -> PENDING_APPROVAL -> APPROVED -> SENT -> COMPLETED, or CANCELLED
+    at any point before COMPLETED. A purchase order that does not need
+    approval skips PENDING_APPROVAL and is created directly in DRAFT
+    (approval is required when the policy engine classifies the action
+    MEDIUM-with-threshold or HIGH — see app/policies).
     """
 
     DRAFT = "DRAFT"
+    PENDING_APPROVAL = "PENDING_APPROVAL"
+    APPROVED = "APPROVED"
     SENT = "SENT"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
@@ -89,3 +93,59 @@ class AgentActionStatus(str, enum.Enum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     REJECTED = "REJECTED"
+    PENDING = "PENDING"
+
+
+class ApprovalStatus(str, enum.Enum):
+    """Lifecycle of an approval request (FR-18). PENDING is awaiting a human
+    decision; there is no code path for an agent to mark its own request
+    approved — resolution is always an authenticated human action.
+    """
+
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
+class PolicyType(str, enum.Enum):
+    """Kinds of business policies stored in business_policies (FR-16). The
+    policy engine evaluates these deterministically — never by asking the
+    LLM. Each policy is a key/value row; the `value` JSONB holds the
+    threshold or rule the deterministic engine reads.
+
+    MONEY_THRESHOLD: actions whose computed money impact meets/exceeds the
+        `amount` value are escalated (MEDIUM -> HIGH).
+    APPROVAL_ROLES: which roles may approve a given risk level
+        (value = list of role codes, e.g. ["OWNER","ADMIN"]).
+    """
+
+    MONEY_THRESHOLD = "MONEY_THRESHOLD"
+    APPROVAL_ROLES = "APPROVAL_ROLES"
+
+
+class AuditAction(str, enum.Enum):
+    """Actions recorded in the unified audit_logs table (FR-25). Every
+    state-changing action — human or AI — writes one row: actor, action,
+    target, business, timestamp, before/after summary.
+    """
+
+    LOGIN = "LOGIN"
+    BUSINESS_CREATE = "BUSINESS_CREATE"
+    MEMBER_INVITE = "MEMBER_INVITE"
+    PRODUCT_CREATE = "PRODUCT_CREATE"
+    PRODUCT_UPDATE = "PRODUCT_UPDATE"
+    PRODUCT_DELETE = "PRODUCT_DELETE"
+    INVENTORY_ADJUST = "INVENTORY_ADJUST"
+    CUSTOMER_CREATE = "CUSTOMER_CREATE"
+    SUPPLIER_CREATE = "SUPPLIER_CREATE"
+    SUPPLIER_LINK = "SUPPLIER_LINK"
+    ORDER_CREATE = "ORDER_CREATE"
+    ORDER_CANCEL = "ORDER_CANCEL"
+    INVOICE_PAY = "INVOICE_PAY"
+    PURCHASE_ORDER_CREATE = "PURCHASE_ORDER_CREATE"
+    PURCHASE_ORDER_SEND = "PURCHASE_ORDER_SEND"
+    PURCHASE_ORDER_RECEIVE = "PURCHASE_ORDER_RECEIVE"
+    PURCHASE_ORDER_CANCEL = "PURCHASE_ORDER_CANCEL"
+    POLICY_UPSERT = "POLICY_UPSERT"
+    APPROVAL_DECIDE = "APPROVAL_DECIDE"
+    AGENT_ACTION = "AGENT_ACTION"
