@@ -48,7 +48,15 @@ npm run dev                             # http://localhost:5173
 
 ## First login
 
-There is no seed data yet (spec §30, ships in a later phase). Register a new account at
+Run the demo seed (optional but recommended, Phase 8):
+
+```bash
+cd backend
+python -m app.seed        # idempotent; creates "Demo Traders" + demo@example.com
+```
+
+Then log in at http://localhost:5173/login with `demo@example.com` / `demo-strong-password`
+(owner of the seeded **Demo Traders** business). Alternatively register a new account at
 http://localhost:5173/register, then create a business from the dashboard — the creator is
 automatically made `OWNER` of that business.
 

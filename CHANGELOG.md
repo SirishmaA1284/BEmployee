@@ -5,6 +5,29 @@ All notable changes to this project are documented here, phase by phase (see
 
 ## [Unreleased]
 
+### Real-time messaging (WhatsApp + Telegram)
+
+- **`app/services/messaging.py`**: real delivery for notifications — Telegram Bot
+  API (`sendMessage`) and WhatsApp Business Cloud API (`/messages`, text body,
+  E.164 recipient). Both are best-effort: failures return `{ok: False, error}` and
+  never raise into the caller.
+- **`notify()` dispatch** (`app/services/notification_service.py`): the IN_APP row
+  is always written; with credentials configured the message is sent to every
+  enabled channel and a `TELEGRAM`/`WHATSAPP` row records the delivery (provider
+  message id or error in the payload). Without credentials the behavior is
+  unchanged (IN_APP-only for the default channel; `MOCK_*` rows for explicit
+  channel requests). Worker jobs (low-stock, stockout, daily report) deliver
+  automatically once configured.
+- **Config**: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `WHATSAPP_ACCESS_TOKEN`,
+  `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_TO_PHONE` (`.env.example` documented;
+  `app/core/config.py`). `httpx` moved into `requirements.txt` (was dev-only).
+- **Migration `c9f3a2d41e55`**: adds `TELEGRAM`/`WHATSAPP`/`MOCK_TELEGRAM` to the
+  `notification_channel` PG enum (downgrade no-op — Postgres cannot drop enum
+  values, same policy as `NOTIFICATION_SENT`).
+- **Tests**: 194 backend total (8 unit for the senders — URL/headers/body/error
+  capture with a fake httpx client — plus 5 integration for notify() dispatch:
+  unconfigured fallbacks, real-send rows with monkeypatched senders).
+
 ### Phase 1 — Analysis & Architecture (2026-09-04)
 
 - Added `docs/requirements.md`, `docs/architecture.md`, `docs/decisions.md` covering product

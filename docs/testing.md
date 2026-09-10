@@ -2,10 +2,10 @@
 
 ## Current coverage (through Phase 8)
 
-181 backend tests, all passing against a real Postgres test database (`ai_employee_test`, see
+194 backend tests, all passing against a real Postgres test database (`ai_employee_test`, see
 `docs/setup.md`). Frontend: 4 Vitest tests, `npm run lint` (ESLint) and `npm run build` clean.
 
-- `tests/unit/` (73): password hashing, JWT, deterministic services — pricing (line totals,
+- `tests/unit/` (81): password hashing, JWT, deterministic services — pricing (line totals,
   rounding, tax=0), inventory sufficiency/low-stock math, invoice number formatting,
   supplier-offer ranking; plus Phase 4: LLM provider interface + MockProvider (scripted and
   keyword rules) + provider factory selection/fallbacks, the tool registry contract
@@ -16,7 +16,7 @@
   stockout projection, at-risk flags — pure functions, no DB); plus Phase 7: deterministic
   chunking (paragraph split, hard-split, exact source spans) and mock embedding (fixed-dim,
   deterministic, differs per text).
-- `tests/integration/` (90): register/login/me, business creation/membership; product CRUD +
+- `tests/integration/` (95): register/login/me, business creation/membership; product CRUD +
   auto-created inventory + duplicate-SKU rejection; customer CRUD; supplier CRUD + price
   comparison ranking; inventory adjustment (incl. rejecting a negative result); the full order
   flow (stock check → decrement → invoice generation → cancel-restores-stock-and-voids-invoice);
@@ -42,7 +42,10 @@
   runs a read tool through the registry with the audit trail, write tools and bad auth are
   rejected; plus Phase 8 hardening — refresh-token rotation (issue → rotate → replay rejected →
   revoke via logout), hashed token storage, and rate limiting (429 on auth/agent endpoints,
-  reset between tests).
+  reset between tests); plus real-time messaging — the Telegram/WhatsApp senders (URL,
+  headers, body, and failure capture asserted with a fake httpx client) and `notify()`
+  dispatch (unconfigured channels fall back to `MOCK_*` rows, configured channels record a
+  real-send row with the provider result, default channel delivers to every enabled channel).
 - `tests/agents/` (9): full LangGraph workflows driven by a scripted `MockProvider` against the
   real test database — order end-to-end (extract → resolve → create → verify → summarize),
   unknown-product error path, low-stock, supplier ranking, direct + low-stock-driven purchase

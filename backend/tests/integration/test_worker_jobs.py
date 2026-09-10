@@ -10,13 +10,14 @@ from decimal import Decimal
 
 from app.database.base import utcnow
 from app.models.customer import Customer
-from app.models.enums import NotificationType, OrderStatus
+from app.models.enums import NotificationChannel, NotificationSeverity, NotificationType, OrderStatus
 from app.models.inventory import Inventory
 from app.models.notification import Notification
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.product import Product
 from app.models.user import User
+from app.services.notification_service import notify
 from app.services.worker_jobs import (
     generate_daily_report,
     run_scheduled_checks,
@@ -235,3 +236,133 @@ async def test_approval_pending_notification_surface(client, business, db_sessio
     assert len(rows) == 1
     assert rows[0]["notification_type"] == "APPROVAL_PENDING"
     assert rows[0]["target_type"] == "approval_request"
+
+
+async def _all_notifications(client, headers):
+    return (
+        await client.get("/api/notifications?in_app_only=false", headers=headers)
+    ).json()
+
+
+async def test_notify_default_unconfigured_writes_only_in_app(client, business, db_session):
+    await notify(
+        db_session,
+        business_id=business["business_id"],
+        notification_type=NotificationType.LOW_STOCK,
+        severity=NotificationSeverity.WARNING,
+        title="Low stock",
+        message="Milk is low.",
+    )
+    await db_session.commit()
+
+    rows = await _all_notifications(client, business["owner_headers"])
+    assert len(rows) == 1
+    assert rows[0]["channel"] == "IN_APP"
+
+
+async def test_notify_explicit_whatsapp_unconfigured_writes_mock_row(
+    client, business, db_session
+):
+    await notify(
+        db_session,
+        business_id=business["business_id"],
+        notification_type=NotificationType.LOW_STOCK,
+        severity=NotificationSeverity.WARNING,
+        title="Low stock",
+        message="Milk is low.",
+        channel=NotificationChannel.WHATSAPP,
+    )
+    await db_session.commit()
+
+    rows = await _all_notifications(client, business["owner_headers"])
+    assert {r["channel"] for r in rows} == {"IN_APP", "MOCK_WHATSAPP"}
+    mock = next(r for r in rows if r["channel"] == "MOCK_WHATSAPP")
+    assert mock["payload"]["delivery"] == "mock"
+
+
+async def test_notify_explicit_telegram_unconfigured_writes_mock_row(
+    client, business, db_session
+):
+    await notify(
+        db_session,
+        business_id=business["business_id"],
+        notification_type=NotificationType.LOW_STOCK,
+        severity=NotificationSeverity.WARNING,
+        title="Low stock",
+        message="Milk is low.",
+        channel=NotificationChannel.TELEGRAM,
+    )
+    await db_session.commit()
+
+    rows = await _all_notifications(client, business["owner_headers"])
+    assert {r["channel"] for r in rows} == {"IN_APP", "MOCK_TELEGRAM"}
+
+
+async def test_notify_telegram_configured_sends_real_and_records_row(
+    client, business, db_session, monkeypatch
+):
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "telegram_bot_token", "123:abc")
+    monkeypatch.setattr(settings, "telegram_chat_id", "42")
+
+    async def fake_send(text, **kwargs):
+        assert text == "Low stock\nMilk is low."
+        return {"ok": True, "provider": "telegram", "message_id": 7}
+
+    monkeypatch.setattr(
+        "app.services.notification_service.send_telegram_message", fake_send
+    )
+
+    await notify(
+        db_session,
+        business_id=business["business_id"],
+        notification_type=NotificationType.LOW_STOCK,
+        severity=NotificationSeverity.WARNING,
+        title="Low stock",
+        message="Milk is low.",
+    )
+    await db_session.commit()
+
+    rows = await _all_notifications(client, business["owner_headers"])
+    assert {r["channel"] for r in rows} == {"IN_APP", "TELEGRAM"}
+    telegram = next(r for r in rows if r["channel"] == "TELEGRAM")
+    assert telegram["payload"]["sent"] is True
+    assert telegram["payload"]["provider_message_id"] == 7
+    assert "error" not in telegram["payload"] or telegram["payload"]["error"] is None
+
+
+async def test_notify_whatsapp_configured_sends_real_and_records_row(
+    client, business, db_session, monkeypatch
+):
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "whatsapp_access_token", "tok")
+    monkeypatch.setattr(settings, "whatsapp_phone_number_id", "1234")
+    monkeypatch.setattr(settings, "whatsapp_to_phone", "+919800000000")
+
+    async def fake_send(text, **kwargs):
+        assert text == "Low stock\nMilk is low."
+        return {"ok": False, "provider": "whatsapp", "error": "template required"}
+
+    monkeypatch.setattr(
+        "app.services.notification_service.send_whatsapp_message", fake_send
+    )
+
+    await notify(
+        db_session,
+        business_id=business["business_id"],
+        notification_type=NotificationType.LOW_STOCK,
+        severity=NotificationSeverity.WARNING,
+        title="Low stock",
+        message="Milk is low.",
+    )
+    await db_session.commit()
+
+    rows = await _all_notifications(client, business["owner_headers"])
+    assert {r["channel"] for r in rows} == {"IN_APP", "WHATSAPP"}
+    whatsapp = next(r for r in rows if r["channel"] == "WHATSAPP")
+    assert whatsapp["payload"]["sent"] is False
+    assert whatsapp["payload"]["error"] == "template required"

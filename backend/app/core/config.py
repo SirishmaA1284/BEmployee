@@ -40,6 +40,16 @@ class Settings(BaseSettings):
     scheduler_check_interval_minutes: int = 60
     scheduler_daily_report_hour: int = 8
 
+    # --- Real messaging channels (optional; empty = mock fallback) ---
+    # Telegram: token from @BotFather + chat id of the destination chat.
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+    # WhatsApp Business Cloud API: Meta app access token, the sender's phone
+    # number id, and the destination phone number (E.164, e.g. +9198...).
+    whatsapp_access_token: str = ""
+    whatsapp_phone_number_id: str = ""
+    whatsapp_to_phone: str = ""
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

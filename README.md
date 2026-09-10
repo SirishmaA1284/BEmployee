@@ -24,7 +24,7 @@ anything risky, verifies its own results, and leaves a full audit trail.
 > read-only MCP server. Phase 8 hardens: rotating refresh tokens, per-IP rate limiting,
 > structured logging, seed/demo data, frontend lint + automated tests, deployment docs. A chat
 > UI and the Orders/Inventory/Suppliers/Purchase Orders/Policies/Approvals/Alerts/Documents
-> pages are live in the frontend. 181 passing backend tests + 4 frontend tests
+> pages are live in the frontend. 194 passing backend tests + 4 frontend tests
 > (`docs/testing.md`).
 
 ## 1. What this is
@@ -137,15 +137,19 @@ See [`.env.example`](.env.example). Copy it to `.env` and fill in real values; n
 
 ## 11. Running locally / tests / deployment
 
-[`docs/development.md`](docs/development.md), [`docs/testing.md`](docs/testing.md) (181 backend
+[`docs/development.md`](docs/development.md), [`docs/testing.md`](docs/testing.md) (194 backend
 tests passing as of Phase 8), [`docs/deployment.md`](docs/deployment.md) (local Docker-Compose
 path verified; hosted plan documented). Run the demo data with
 `docker compose exec backend python -m app.seed`.
 
 ## 12. Demo credentials
 
-None yet — seed data ships in a later phase (spec §30). This section will list demo
-owner/employee logins for the seeded demo business once available.
+Seed data ships with the repo (`python -m app.seed`, Phase 8 — see `docs/setup.md`). Run it
+once against a fresh DB, then log in at http://localhost:5173/login with:
+
+- Owner: `demo@example.com` / `demo-strong-password` (business: **Demo Traders**, 5 products,
+  3 customers, 3 suppliers, an order + invoice, a draft PO, a low-stock item for alerts, and a
+  document for RAG queries)
 
 ## 13. Example workflows
 

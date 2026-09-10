@@ -178,9 +178,14 @@ class NotificationChannel(str, enum.Enum):
     """Delivery channels for a notification. IN_APP is always written; the
     MOCK channels exist for the messaging mock (docs/decisions.md A6) and
     simply log the "sent" message — no real provider credentials needed.
+    TELEGRAM/WHATSAPP rows record a real delivery attempt when the
+    corresponding credentials are configured (app/services/messaging.py).
     """
 
     IN_APP = "IN_APP"
+    TELEGRAM = "TELEGRAM"
+    WHATSAPP = "WHATSAPP"
+    MOCK_TELEGRAM = "MOCK_TELEGRAM"
     MOCK_WHATSAPP = "MOCK_WHATSAPP"
     MOCK_SMS = "MOCK_SMS"
     MOCK_EMAIL = "MOCK_EMAIL"
