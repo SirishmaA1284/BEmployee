@@ -173,6 +173,8 @@ Policy types:
   requires approval). The smallest active threshold wins.
 - `APPROVAL_ROLES` — `value: { "roles": ["OWNER","ADMIN",...] }`. Which roles may decide
   approval requests. Defaults to `["OWNER","ADMIN"]` when unset.
+- `APPROVAL_STAGES` (Phase 9) — `value: { "stages": N }` (N ≥ 1). How many *sequential* human
+  approvals a HIGH-risk request requires. Defaults to 1 (a single decision) when unset.
 
 Example (po above 500 requires approval):
 ```
@@ -186,16 +188,26 @@ HIGH-risk agent actions (FR-18) create an approval request and **stop before exe
 human resolves it here. The decision is role-gated by the business's APPROVAL_ROLES policy
 (default OWNER/ADMIN). There is no code path for an agent to approve its own request.
 
+Phase 9: with an `APPROVAL_STAGES` policy the request carries one `steps` entry per required
+stage, resolved **in order**; consecutive stages must be decided by *different* people (the
+same user approving two stages in a row is rejected with 409). The request stays `PENDING`
+until every stage is `APPROVED`; a rejection at any stage ends the chain as `REJECTED`.
+
 - `GET /api/approvals?status_filter=` — any role. Latest 100 requests, newest first.
   `status_filter` is one of `PENDING`/`APPROVED`/`REJECTED`.
 - `GET /api/approvals/{id}` — any role. 404 if not found / another business's request.
 - `POST /api/approvals/{id}/approve` — role must be in APPROVAL_ROLES. Body: `{ "decision_note"? }`.
-  200 → the request with `status: "APPROVED"`. 403 if the caller's role can't decide; 409 if not
-  `PENDING`.
+  200 → the request (`status` stays `PENDING` while more stages remain — `current_stage`
+  advances). 403 if the caller's role can't decide; 409 if not `PENDING` or the same person
+  tries to decide two consecutive stages.
 - `POST /api/approvals/{id}/reject` — same as approve, sets `status: "REJECTED"`.
 
+Every response includes `required_stages`, `current_stage` (1-based index of the stage awaiting
+a decision), and `steps` (per-stage `status`, `required_roles`, `resolved_by_user_id`,
+`resolved_at`, `decision_note`).
+
 For a request targeting a purchase order in `PENDING_APPROVAL`, the decision drives the PO's
-lifecycle: approve → `APPROVED`, reject → `CANCELLED`.
+lifecycle: full approval → `APPROVED`, rejection → `CANCELLED`.
 
 ## Audit Log (`app/api/audit.py`)
 
@@ -208,15 +220,21 @@ REST write and every registry tool call; read-only here.
 
 ## Notifications (`app/api/notifications.py`)
 
-Proactive alerts created by the scheduler worker and the backend (FR-24, ADR-007). Read-only
-here — creation happens in the worker, never via the API.
+Proactive alerts created by the scheduler worker and the backend (FR-24, ADR-007). Creation
+happens in the worker, never via the API; read state (Phase 9) is per member.
 
-- `GET /api/notifications?type_filter=&in_app_only=&limit=` — any role. Latest notifications for
-  the business (max 500), newest first. `type_filter` is one of `LOW_STOCK`/
+- `GET /api/notifications?type_filter=&in_app_only=&unread_only=&limit=` — any role. Latest
+  notifications for the business (max 500), newest first. `type_filter` is one of `LOW_STOCK`/
   `FORECASTED_STOCKOUT`/`APPROVAL_PENDING`/`DAILY_REPORT`; `in_app_only` defaults to `true` (the
-  MOCK_* channel rows from the A6 messaging mock are hidden by default). Each entry:
+  MOCK_* channel rows from the A6 messaging mock are hidden by default); `unread_only=true`
+  returns only notifications the current member hasn't read. Each entry:
   `notification_type`, `severity` (`INFO`/`WARNING`/`CRITICAL`), `title`, `message`, `payload`
-  (JSON-safe details, e.g. product/forecast values), `target_type`/`target_id`, `created_at`.
+  (JSON-safe details, e.g. product/forecast values), `target_type`/`target_id`, `created_at`,
+  `read` (per current member).
+- `POST /api/notifications/{id}/read` — any role. Marks one notification read by the caller
+  (idempotent). 204; 404 if not in the active business.
+- `POST /api/notifications/read-all` — any role. Marks every in-app notification of the business
+  read by the caller. 204.
 
 ## AI Employee (`app/api/agents.py`)
 
@@ -246,8 +264,11 @@ the documents that informed them (FR-21/22/23, `docs/rag.md`).
 
 - `POST /api/documents` — OWNER/ADMIN. `multipart/form-data`: `file` (≤ 2 MiB) and optional
   `title`. Content-type must be one of `text/plain`, `text/markdown`, `text/csv`,
-  `application/json` (415 otherwise). 201 → `DocumentRead`; chunks are created in the same
-  transaction.
+  `application/json`, `application/pdf`, or
+  `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (415 otherwise).
+  PDF/DOCX are parsed deterministically (pypdf / python-docx); a corrupt or text-less file is
+  rejected with 422 and nothing is persisted. 201 → `DocumentRead`; chunks are created in the
+  same transaction.
 - `GET /api/documents` — any role. Non-deleted documents for the business, newest first.
 - `GET /api/documents/{id}` — any role. Detail incl. `chunk_count` + `chunks`
   (content + source spans). 404 for another business's / deleted document.

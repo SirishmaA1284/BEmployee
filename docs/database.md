@@ -160,16 +160,22 @@ Migration `d2e271d74b0f`. Purchase orders gained `PENDING_APPROVAL`/`APPROVED` s
 `agent_actions` gained `PENDING` (both via `ALTER TYPE ... ADD VALUE`).
 
 - **`business_policies`** — one row per business policy: `business_id`, `policy_type` (enum:
-  MONEY_THRESHOLD, APPROVAL_ROLES), `key` (stable, upsert key), `value` (JSONB, e.g.
-  `{"amount": "500.00"}` or `{"roles": ["OWNER","ADMIN"]}`), `description?`, `is_active`,
-  `updated_by_user_id`. Read/written by the policies API; **evaluated deterministically** by
-  `app/policies/policies.py`, never by the LLM (ADR-004).
+  MONEY_THRESHOLD, APPROVAL_ROLES, APPROVAL_STAGES), `key` (stable, upsert key), `value` (JSONB,
+  e.g. `{"amount": "500.00"}`, `{"roles": ["OWNER","ADMIN"]}`, or `{"stages": 2}`),
+  `description?`, `is_active`, `updated_by_user_id`. Read/written by the policies API;
+  **evaluated deterministically** by `app/policies/policies.py`, never by the LLM (ADR-004).
 - **`approval_requests`** — a HIGH-risk (or policy-escalated) action awaiting a human decision
   (FR-18). `business_id`, `action` (tool name), `summary?`, `payload` (JSONB — the proposed
   action's arguments), `risk_level` (LOW/MEDIUM/HIGH), `target_type?`/`target_id?` (e.g. a
   `purchase_order` created in `PENDING_APPROVAL`), `status` (enum: PENDING, APPROVED, REJECTED),
-  `requested_by_user_id`, `resolved_by_user_id?`, `resolved_at?`, `decision_note?`. No code path
+  `requested_by_user_id`, `resolved_by_user_id?`, `resolved_at?`, `decision_note?`,
+  `required_stages` (Phase 9 — total sequential approvals required, default 1). No code path
   lets an agent (or the requester) approve their own request.
+- **`approval_request_steps`** (Phase 9) — one row per stage of a multi-stage approval:
+  `approval_request_id` (indexed, CASCADE), `stage_number` (1-based), `status` (same
+  `approval_status` enum), `required_roles` (JSONB — copied from APPROVAL_ROLES at creation so
+  later policy edits don't change an open request), `resolved_by_user_id?`, `resolved_at?`,
+  `decision_note?`. Resolved in order; consecutive stages must be decided by different people.
 - **`audit_logs`** — unified, append-only trail of **all** state changes (FR-25): REST writes
   and every registry tool call append a row. `business_id`, `actor_type` (enum: USER, AGENT),
   `actor_user_id?`, `action` (enum: AUDIT_LOG/CREATE/UPDATE/DELETE/AGENT_ACTION/APPROVAL_DECIDE/
@@ -189,8 +195,18 @@ Migration `05beb7c32bed`. `audit_action` gained `NOTIFICATION_SENT`.
   MOCK_EMAIL — the MOCK channels are the A6 messaging mock, they log the "sent" message and
   need no real provider credentials), `title`, `message`, `payload` (JSONB, JSON-safe details
   the UI renders), `target_type?`/`target_id?`, `created_at`. Immutable once created (no
-  `updated_at`) — read state lives in the frontend, not on the row. Read-only via
+  `updated_at`) — read state lives in `notification_reads`, not on the row. Read-only via
   `GET /api/notifications`.
+
+## Phase 9 tables (Approval stages & notification reads — 2026-09-11)
+
+Migration `1a2b3c4d5e6f`. `policy_type` gains `APPROVAL_STAGES`.
+
+- **`approval_request_steps`** — see Phase 5 `approval_requests` above (multi-stage chain).
+- **`notification_reads`** — per-user read markers for business-scoped notifications:
+  composite PK (`notification_id` CASCADE, `user_id` CASCADE), `read_at`. A row means that
+  member has read that notification; absent means unread. Each member tracks their own state
+  independently. Written by `POST /api/notifications/{id}/read` and `read-all`.
 
 ## Phase 7 tables (Documents & RAG — FR-21, ADR-006)
 
@@ -245,6 +261,10 @@ Migrations so far:
   `audit_action` gains `DOCUMENT_UPLOAD`/`DOCUMENT_DELETE`; `agent_intent` gains
   `ASK_DOCUMENTS`.
 - `b1244bf28ccb` — Phase 8: `refresh_tokens` (rotating refresh tokens).
+- `c9f3a2d41e55` — real-time messaging: `notification_channel` gains
+  TELEGRAM/WHATSAPP/MOCK_TELEGRAM.
+- `1a2b3c4d5e6f` — Phase 9: `approval_request_steps`, `notification_reads`,
+  `approval_requests.required_stages`, `policy_type` gains `APPROVAL_STAGES`.
 
 Each was generated via `alembic revision --autogenerate` against a real Postgres instance,
 reviewed by hand, and applied before being committed. To migrate the dedicated test database

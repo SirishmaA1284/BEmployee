@@ -1,4 +1,5 @@
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,15 +24,24 @@ from app.api import (
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.mcp.server import router as mcp_router
+from app.security.rate_limit import init_rate_limiter
 
 settings = get_settings()
 configure_logging()
 logger = get_logger("app")
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_rate_limiter()
+    yield
+
+
 app = FastAPI(
     title="AI Employee Platform API",
     description="Backend for the AI Employee Platform for Small Businesses.",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

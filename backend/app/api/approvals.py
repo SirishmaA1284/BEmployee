@@ -1,9 +1,11 @@
-"""Approval request API (FR-18).
+"""Approval request API (FR-18, Phase 9 multi-stage).
 
 HIGH-risk actions (or policy-flagged writes) create an approval request and
-stop before execution. A human resolves it here; the decision is role-gated
-by the business's APPROVAL_ROLES policy (default OWNER/ADMIN). There is no
-code path for an agent to approve its own request.
+stop before execution. A human resolves the current stage here; the decision
+is role-gated by the step's APPROVAL_ROLES (copied from the business policy
+at request creation, default OWNER/ADMIN), and consecutive stages must be
+decided by different people. There is no code path for an agent to approve
+its own request.
 """
 
 import uuid
@@ -11,13 +13,14 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database.session import get_db
 from app.models.approval import ApprovalRequest
 from app.models.business_member import BusinessMember
 from app.models.enums import ApprovalStatus
 from app.models.user import User
-from app.schemas.approval import ApprovalDecision, ApprovalRequestRead
+from app.schemas.approval import ApprovalDecision, ApprovalRequestRead, ApprovalStepRead
 from app.security.dependencies import get_current_membership, get_current_user
 from app.services.approval_service import decide
 from app.services.errors import BusinessRuleError
@@ -26,6 +29,11 @@ router = APIRouter(prefix="/api/approvals", tags=["approvals"])
 
 
 def _to_read(approval: ApprovalRequest) -> ApprovalRequestRead:
+    steps = list(approval.steps)
+    current_stage = next(
+        (s.stage_number for s in steps if s.status == ApprovalStatus.PENDING),
+        approval.required_stages,
+    )
     return ApprovalRequestRead(
         id=approval.id,
         action=approval.action,
@@ -40,6 +48,21 @@ def _to_read(approval: ApprovalRequest) -> ApprovalRequestRead:
         resolved_at=approval.resolved_at,
         decision_note=approval.decision_note,
         created_at=approval.created_at,
+        required_stages=approval.required_stages,
+        current_stage=current_stage,
+        steps=[
+            ApprovalStepRead(
+                id=s.id,
+                stage_number=s.stage_number,
+                status=s.status,
+                required_roles=s.required_roles,
+                resolved_by_user_id=s.resolved_by_user_id,
+                resolved_at=s.resolved_at,
+                decision_note=s.decision_note,
+                created_at=s.created_at,
+            )
+            for s in steps
+        ],
     )
 
 
@@ -49,8 +72,10 @@ async def list_approval_requests(
     db: AsyncSession = Depends(get_db),
     status_filter: ApprovalStatus | None = None,
 ) -> list[ApprovalRequestRead]:
-    statement = select(ApprovalRequest).where(
-        ApprovalRequest.business_id == membership.business_id
+    statement = (
+        select(ApprovalRequest)
+        .options(selectinload(ApprovalRequest.steps))
+        .where(ApprovalRequest.business_id == membership.business_id)
     )
     if status_filter is not None:
         statement = statement.where(ApprovalRequest.status == status_filter)
@@ -66,7 +91,9 @@ async def get_approval_request(
     db: AsyncSession = Depends(get_db),
 ) -> ApprovalRequestRead:
     result = await db.execute(
-        select(ApprovalRequest).where(
+        select(ApprovalRequest)
+        .options(selectinload(ApprovalRequest.steps))
+        .where(
             ApprovalRequest.id == approval_id,
             ApprovalRequest.business_id == membership.business_id,
         )

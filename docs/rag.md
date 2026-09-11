@@ -6,9 +6,10 @@ documented in `docs/architecture.md` §4; the untrusted-context handling is in
 
 ## Pipeline
 
-1. **Upload** (`POST /api/documents`, OWNER/ADMIN): a text-based file (.txt/.md/.csv/.json, ≤ 2
-   MiB) is stored as a `documents` row. Content-type is checked against an allow-list
-   (docs/security.md); binary formats (PDF/DOCX) are out of MVP scope.
+1. **Upload** (`POST /api/documents`, OWNER/ADMIN): a file (.txt/.md/.csv/.json, plus PDF and
+   DOCX since Phase 9, ≤ 2 MiB) is stored as a `documents` row. Content-type is checked against
+   an allow-list (docs/security.md); PDF/DOCX text is extracted deterministically by
+   `app/services/extraction.py` (pypdf / python-docx) before chunking.
 2. **Chunking** (`app/services/chunking.py`): deterministic, never the LLM. Split into
    paragraphs, then hard-split any oversized paragraph at word boundaries (`max_chars`, default
    1200). No overlap — a paragraph belongs to exactly one chunk, and each chunk records its

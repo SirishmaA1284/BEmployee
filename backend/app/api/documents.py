@@ -4,9 +4,10 @@ Upload/list/detail/delete of business documents; each upload is chunked and
 embedded (pgvector) at ingest time. `POST /api/documents/query` runs a
 business-scoped RAG retrieval and returns a cited answer.
 
-Upload validation (docs/security.md): content-type allow-list (text-based
-formats only for MVP) + size limit. Document writes are OWNER/ADMIN; reads
-and RAG queries are open to any member.
+Upload validation (docs/security.md): content-type allow-list (text,
+PDF, and DOCX — parsed deterministically by app/services/extraction.py) +
+size limit. Document writes are OWNER/ADMIN; reads and RAG queries are
+open to any member.
 """
 
 import uuid
@@ -41,13 +42,15 @@ router = APIRouter(prefix="/api/documents", tags=["documents"])
 
 _write_role = require_role(BusinessRole.OWNER, BusinessRole.ADMIN)
 
-# Allowed upload content types. Text-based only for MVP — binary formats
-# (PDF/DOCX) need extraction tooling documented as out of scope (docs/security.md).
+# Allowed upload content types. Text-based formats are decoded directly;
+# PDF/DOCX are parsed deterministically (app/services/extraction.py).
 _ALLOWED_CONTENT_TYPES = {
     "text/plain": ".txt",
     "text/markdown": ".md",
     "text/csv": ".csv",
     "application/json": ".json",
+    "application/pdf": ".pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
 }
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024  # 2 MiB
 

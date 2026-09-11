@@ -19,6 +19,11 @@ Status: design-level now; implemented in Phase 2, extended per-domain in later p
 - Approval authority for HIGH-risk actions defaults to `OWNER`/`ADMIN`; whether `EMPLOYEE` can
   approve MEDIUM-risk actions is a per-business policy setting (`business_policies`), not
   hardcoded.
+- Multi-stage (chained) approval (Phase 9): an `APPROVAL_STAGES` policy (`{"stages": N}`)
+  makes HIGH-risk requests require N sequential approvals. Stages resolve in order and
+  consecutive stages must be decided by **different** people — the same user approving two
+  stages in a row is rejected with 409. Roles per stage are copied from `APPROVAL_ROLES` at
+  request creation, so later policy edits never change an open request.
 
 ## Enforcement Points
 

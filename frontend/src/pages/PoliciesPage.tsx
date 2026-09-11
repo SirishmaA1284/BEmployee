@@ -4,13 +4,22 @@ import type { FormEvent } from "react";
 
 import { listPolicies, upsertPolicy } from "../api/governance";
 import { PageLayout } from "../components/PageLayout";
-import type { PolicyType } from "../types/governance";
+import type { PolicyRead, PolicyType } from "../types/governance";
+
+function policyValueLabel(policy: PolicyRead): string {
+  const value = policy.value as { amount?: string; roles?: string[]; stages?: number };
+  if (policy.policy_type === "MONEY_THRESHOLD") return value.amount ?? "-";
+  if (policy.policy_type === "APPROVAL_ROLES") return (value.roles ?? []).join(", ");
+  if (policy.policy_type === "APPROVAL_STAGES") return `${value.stages ?? 1} stage(s)`;
+  return "-";
+}
 
 export function PoliciesPage() {
   const queryClient = useQueryClient();
   const [policyType, setPolicyType] = useState<PolicyType>("MONEY_THRESHOLD");
   const [key, setKey] = useState("po_threshold");
   const [amount, setAmount] = useState("5000.00");
+  const [stages, setStages] = useState("2");
   const [description, setDescription] = useState("Purchase orders above this amount need approval");
 
   const policiesQuery = useQuery({ queryKey: ["policies"], queryFn: listPolicies });
@@ -20,7 +29,12 @@ export function PoliciesPage() {
       upsertPolicy({
         key,
         policy_type: policyType,
-        value: policyType === "MONEY_THRESHOLD" ? { amount } : { roles: ["OWNER", "ADMIN"] },
+        value:
+          policyType === "MONEY_THRESHOLD"
+            ? { amount }
+            : policyType === "APPROVAL_STAGES"
+              ? { stages: Number(stages) }
+              : { roles: ["OWNER", "ADMIN"] },
         description: description || undefined,
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["policies"] }),
@@ -30,8 +44,6 @@ export function PoliciesPage() {
     event.preventDefault();
     upsertMutation.mutate();
   }
-
-  const moneyPolicies = (policiesQuery.data ?? []).filter((p) => p.policy_type === "MONEY_THRESHOLD");
 
   return (
     <PageLayout>
@@ -53,6 +65,7 @@ export function PoliciesPage() {
               >
                 <option value="MONEY_THRESHOLD">Money threshold</option>
                 <option value="APPROVAL_ROLES">Approval roles</option>
+                <option value="APPROVAL_STAGES">Approval stages</option>
               </select>
             </label>
             <label className="flex flex-col gap-1 text-xs">
@@ -69,6 +82,19 @@ export function PoliciesPage() {
                 <input
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
+                  className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+                />
+              </label>
+            )}
+            {policyType === "APPROVAL_STAGES" && (
+              <label className="flex flex-col gap-1 text-xs">
+                Stages (sequential approvals)
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={stages}
+                  onChange={(e) => setStages(e.target.value)}
                   className="rounded-md border border-slate-300 px-3 py-2 text-sm"
                 />
               </label>
@@ -95,16 +121,17 @@ export function PoliciesPage() {
 
       <section>
         <h2 className="mb-3 text-lg font-semibold">Configured policies</h2>
-        {moneyPolicies.length === 0 && (
-          <p className="text-sm text-slate-500">No money-threshold policies configured.</p>
+        {(policiesQuery.data ?? []).length === 0 && (
+          <p className="text-sm text-slate-500">No policies configured.</p>
         )}
         <ul className="space-y-2">
-          {moneyPolicies.map((policy) => (
+          {(policiesQuery.data ?? []).map((policy) => (
             <li key={policy.id} className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm">
               <div className="flex items-center justify-between">
                 <span className="font-medium">{policy.key}</span>
                 <span className="text-xs text-slate-500">
-                  {(policy.value as { amount?: string }).amount} · {policy.is_active ? "active" : "inactive"}
+                  {policy.policy_type} · {policyValueLabel(policy)} ·{" "}
+                  {policy.is_active ? "active" : "inactive"}
                 </span>
               </div>
               {policy.description && <p className="mt-1 text-xs text-slate-500">{policy.description}</p>}

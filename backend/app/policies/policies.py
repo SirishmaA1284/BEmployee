@@ -157,3 +157,23 @@ def approval_roles_for(policies: list[BusinessPolicy], risk_level: RiskLevel) ->
         if isinstance(roles, list):
             return [str(r) for r in roles]
     return ["OWNER", "ADMIN"]
+
+
+def approval_stages_for(policies: list[BusinessPolicy]) -> int:
+    """How many sequential human approvals a HIGH-risk request needs (Phase 9).
+
+    Reads the APPROVAL_STAGES policy (value = {"stages": N}, N >= 1).
+    Defaults to 1 (a single decision — Phase 5 behavior) when unset or
+    invalid, so existing businesses keep working without configuring
+    anything new.
+    """
+    for policy in policies:
+        if policy.policy_type != PolicyType.APPROVAL_STAGES or not policy.is_active:
+            continue
+        try:
+            stages = int(policy.value["stages"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if stages >= 1:
+            return stages
+    return 1

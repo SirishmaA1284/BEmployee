@@ -27,6 +27,11 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:5173"
 
+    # --- Phase 9: distributed rate limiting (docs/security.md) ---
+    # Redis URL for the shared rate-limit counters. Empty = in-process
+    # (single-instance) limiter, which is what tests and local runs use.
+    redis_url: str = ""
+
     # --- Phase 4: LLM provider (docs/decisions.md ADR-005) ---
     llm_provider: str = "mock"  # openai | anthropic | gemini | mock
     openai_api_key: str = ""

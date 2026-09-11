@@ -1,11 +1,11 @@
 # Testing Strategy
 
-## Current coverage (through Phase 8)
+## Current coverage (through Phase 9)
 
-194 backend tests, all passing against a real Postgres test database (`ai_employee_test`, see
+220 backend tests, all passing against a real Postgres test database (`ai_employee_test`, see
 `docs/setup.md`). Frontend: 4 Vitest tests, `npm run lint` (ESLint) and `npm run build` clean.
 
-- `tests/unit/` (81): password hashing, JWT, deterministic services — pricing (line totals,
+- `tests/unit/` (97): password hashing, JWT, deterministic services — pricing (line totals,
   rounding, tax=0), inventory sufficiency/low-stock math, invoice number formatting,
   supplier-offer ranking; plus Phase 4: LLM provider interface + MockProvider (scripted and
   keyword rules) + provider factory selection/fallbacks, the tool registry contract
@@ -15,8 +15,11 @@
   defaults, projected money impact); plus Phase 6: forecasting math (moving-average demand,
   stockout projection, at-risk flags — pure functions, no DB); plus Phase 7: deterministic
   chunking (paragraph split, hard-split, exact source spans) and mock embedding (fixed-dim,
-  deterministic, differs per text).
-- `tests/integration/` (95): register/login/me, business creation/membership; product CRUD +
+  deterministic, differs per text); plus Phase 9: text extraction from in-memory PDF (hand-built
+  single-page PDF) and DOCX samples (paragraphs + tables) with corrupt-file 422s, the
+  rate-limiter backends (in-process window reset; Redis INCR+EXPIRE counting/limit/expiry
+  against a fake pipeline), and the `approval_stages_for` policy helper.
+- `tests/integration/` (105): register/login/me, business creation/membership; product CRUD +
   auto-created inventory + duplicate-SKU rejection; customer CRUD; supplier CRUD + price
   comparison ranking; inventory adjustment (incl. rejecting a negative result); the full order
   flow (stock check → decrement → invoice generation → cancel-restores-stock-and-voids-invoice);
@@ -45,7 +48,14 @@
   reset between tests); plus real-time messaging — the Telegram/WhatsApp senders (URL,
   headers, body, and failure capture asserted with a fake httpx client) and `notify()`
   dispatch (unconfigured channels fall back to `MOCK_*` rows, configured channels record a
-  real-send row with the provider result, default channel delivers to every enabled channel).
+  real-send row with the provider result, default channel delivers to every enabled channel);
+  plus Phase 9 — per-user notification read state (start unread → mark read → `unread_only`
+  filter, per-user isolation between owner and employee, bulk read-all, cross-business 404),
+  multi-stage approval (a 2-stage HIGH-risk PO request advances stage-by-stage with the PO
+  gated until the final stage, the same approver is rejected with 409 on consecutive stages,
+  a second-approver rejection cancels the PO, and no-policy businesses keep the single-decision
+  Phase 5 behavior), and PDF/DOCX uploads (binary files parsed into chunks, corrupt PDFs
+  rejected with 422 and nothing half-ingested).
 - `tests/agents/` (9): full LangGraph workflows driven by a scripted `MockProvider` against the
   real test database — order end-to-end (extract → resolve → create → verify → summarize),
   unknown-product error path, low-stock, supplier ranking, direct + low-stock-driven purchase

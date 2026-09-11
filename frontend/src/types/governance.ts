@@ -1,4 +1,4 @@
-export type PolicyType = "MONEY_THRESHOLD" | "APPROVAL_ROLES";
+export type PolicyType = "MONEY_THRESHOLD" | "APPROVAL_ROLES" | "APPROVAL_STAGES";
 
 export interface PolicyRead {
   id: string;
@@ -11,6 +11,17 @@ export interface PolicyRead {
 }
 
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface ApprovalStepRead {
+  id: string;
+  stage_number: number;
+  status: ApprovalStatus;
+  required_roles: string[];
+  resolved_by_user_id: string | null;
+  resolved_at: string | null;
+  decision_note: string | null;
+  created_at: string;
+}
 
 export interface ApprovalRequestRead {
   id: string;
@@ -26,6 +37,9 @@ export interface ApprovalRequestRead {
   resolved_at: string | null;
   decision_note: string | null;
   created_at: string;
+  required_stages: number;
+  current_stage: number;
+  steps: ApprovalStepRead[];
 }
 
 export type AuditAction =
@@ -83,4 +97,5 @@ export interface NotificationRead {
   target_type: string | null;
   target_id: string | null;
   created_at: string;
+  read: boolean;
 }

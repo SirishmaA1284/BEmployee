@@ -5,7 +5,8 @@ system that reads real business data, plans multi-step operational work (orders,
 procurement, reporting), executes what it's authorized to execute, asks a human for approval on
 anything risky, verifies its own results, and leaves a full audit trail.
 
-> **Status:** MVP complete (through Phase 8 — Hardening & Polish). This README describes the target
+> **Status:** MVP complete (through Phase 8 — Hardening & Polish) plus Phase 9 (distributed
+> hardening). This README describes the target
 > system; sections not yet implemented are marked accordingly. See `CHANGELOG.md` for what has
 > actually shipped, phase by phase. Working today: registration/login, businesses with
 > role-based multi-tenant authorization, full CRUD + business logic for products
@@ -22,9 +23,12 @@ anything risky, verifies its own results, and leaves a full audit trail.
 > (forecasting, low-stock/stockout alerts, daily reports) and notifications. Phase 7 adds
 > document upload → RAG (business-scoped pgvector retrieval, cited answers) and a minimal
 > read-only MCP server. Phase 8 hardens: rotating refresh tokens, per-IP rate limiting,
-> structured logging, seed/demo data, frontend lint + automated tests, deployment docs. A chat
+> structured logging, seed/demo data, frontend lint + automated tests, deployment docs.
+> Phase 9 (current) adds PDF/DOCX upload extraction, per-user notification read state,
+> multi-stage (chained) approvals via an `APPROVAL_STAGES` policy, and a distributed
+> Redis-backed rate limiter. A chat
 > UI and the Orders/Inventory/Suppliers/Purchase Orders/Policies/Approvals/Alerts/Documents
-> pages are live in the frontend. 194 passing backend tests + 4 frontend tests
+> pages are live in the frontend. 220 passing backend tests + 4 frontend tests
 > (`docs/testing.md`).
 
 ## 1. What this is

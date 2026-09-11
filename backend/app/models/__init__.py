@@ -4,7 +4,7 @@ SQLAlchemy's mapper configuration see the full schema from a single import.
 
 from app.database.base import Base
 from app.models.agent import AgentAction, AgentSession, AgentTask
-from app.models.approval import ApprovalRequest
+from app.models.approval import ApprovalRequest, ApprovalStep
 from app.models.audit import AuditLog
 from app.models.business import Business
 from app.models.business_member import BusinessMember
@@ -32,7 +32,7 @@ from app.models.enums import (
 from app.models.inventory import Inventory
 from app.models.invoice import Invoice
 from app.models.invoice_item import InvoiceItem
-from app.models.notification import Notification
+from app.models.notification import Notification, NotificationReadState
 from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.payment import Payment
@@ -54,10 +54,12 @@ __all__ = [
     "BusinessPolicy",
     "PolicyType",
     "ApprovalRequest",
+    "ApprovalStep",
     "ApprovalStatus",
     "AuditLog",
     "AuditAction",
     "Notification",
+    "NotificationReadState",
     "NotificationType",
     "NotificationSeverity",
     "NotificationChannel",

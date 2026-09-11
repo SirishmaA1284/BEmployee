@@ -18,15 +18,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.llm.base import ToolCallRequest
 from app.models.agent import AgentAction
-from app.models.approval import ApprovalRequest
 from app.models.enums import (
     AgentActionStatus,
-    ApprovalStatus,
     AuditAction,
     BusinessRole,
 )
 from app.policies.policies import evaluate_risk
 from app.policies.risk import RiskLevel
+from app.services.approval_service import create_approval_request
 from app.services.audit_service import record_audit
 from app.services.errors import BusinessRuleError
 from app.services.purchase_order_service import create_purchase_order as create_po_service
@@ -168,18 +167,17 @@ class ToolRegistry:
                 target_id = po.id
                 data = {"purchase_order_id": str(po.id), "status": po.status.value}
 
-            approval = ApprovalRequest(
+            approval = await create_approval_request(
+                db,
                 business_id=business_id,
                 action=name,
-                summary=f"Agent proposed '{name}' with risk {risk_level.value}.",
                 payload=_json_safe(validated.model_dump()),
                 risk_level=risk_level.value,
                 requested_by_user_id=user_id,
+                summary=f"Agent proposed '{name}' with risk {risk_level.value}.",
                 target_type=target_type,
                 target_id=target_id,
             )
-            db.add(approval)
-            await db.flush()
             db.add(
                 AgentAction(
                     task_id=task_id,

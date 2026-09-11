@@ -122,6 +122,9 @@ class PolicyType(str, enum.Enum):
 
     MONEY_THRESHOLD = "MONEY_THRESHOLD"
     APPROVAL_ROLES = "APPROVAL_ROLES"
+    # Phase 9: how many sequential human approvals a HIGH-risk request needs
+    # (value = {"stages": N}, N >= 1; default 1).
+    APPROVAL_STAGES = "APPROVAL_STAGES"
 
 
 class AuditAction(str, enum.Enum):

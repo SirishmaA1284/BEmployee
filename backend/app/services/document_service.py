@@ -5,10 +5,9 @@ pipeline: store the `Document` row, chunk the extracted text, embed each
 chunk, and persist `DocumentChunk` rows (pgvector). All in one transaction
 so a failed embed never leaves half a document.
 
-Supported upload types are text-based only for MVP (the allow-list in
-`app/api/documents.py`): .txt/.md/.csv/.json. Binary formats (PDF, DOCX)
-are documented as out of scope (docs/security.md — virus scanning is a
-production-hardening item).
+Supported upload types (the allow-list in `app/api/documents.py`):
+text-based .txt/.md/.csv/.json plus PDF and DOCX, all parsed
+deterministically by `app/services/extraction.py` (Phase 9).
 
 `delete` is a soft delete so historical RAG citations stay resolvable.
 """
@@ -24,6 +23,7 @@ from app.database.base import utcnow
 from app.models.document import Document, DocumentChunk
 from app.services.chunking import chunk_text
 from app.services.errors import BusinessRuleError
+from app.services.extraction import extract_text
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ async def ingest_document(
     title: str | None = None,
 ) -> Document:
     """Store a document, chunk its text, embed the chunks, and persist them."""
-    text = content.decode("utf-8", errors="replace")
+    text = extract_text(content_type=content_type, content=content)
     if not text.strip():
         raise BusinessRuleError(422, "Document contains no extractable text")
 

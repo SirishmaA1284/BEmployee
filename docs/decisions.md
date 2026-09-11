@@ -302,7 +302,8 @@ and avoids building resumability machinery nothing calls yet (Rule 6 spirit).
   rebuilds the backend image for the new langgraph/openai dependencies; Phase 6 adds the
   `worker` service per ADR-007; Phase 7 adds pgvector to requirements for RAG)
 - [x] Rate limiting works (Phase 8 — per-IP limits on auth + agent chat endpoints; 429 on
-  overflow; reset per test via `reset_rate_limits`)
+  overflow; reset per test via `reset_rate_limits`; Phase 9 — distributed via Redis when
+  `REDIS_URL` is set, in-process fallback otherwise)
 - [x] Refresh-token rotation works (Phase 8 — opaque tokens stored as SHA-256 hashes; `refresh`
   rotates, `logout` revokes, replay rejected; `refresh_tokens` table)
 - [x] Frontend automated tests + lint exist (Phase 8 — Vitest + Testing Library; ESLint flat
@@ -311,8 +312,11 @@ and avoids building resumability machinery nothing calls yet (Rule 6 spirit).
   workflow/session IDs on agent runs, key=value log lines)
 - [x] Documentation is complete (all `docs/*.md` filled in through Phase 8; deployment.md has
   tested Docker-Compose steps + a documented hosted plan)
-- [x] README is complete (status reflects Phase 8, links to all docs)
+- [x] README is complete (status reflects Phase 9, links to all docs)
 - [x] `.env.example` exists (maintained every phase — LLM provider, scheduler, embedding model,
-  messaging keys, MCP, refresh-token expiry)
+  messaging keys, MCP, refresh-token expiry, Redis)
 - [x] Deployment instructions exist (Phase 8 — docs/deployment.md: local Docker-Compose path
   verified, hosted plan documented)
+- [x] Phase 9 hardening: PDF/DOCX upload extraction, per-user notification read state,
+  multi-stage (chained) approvals (`APPROVAL_STAGES` policy; different approver per stage),
+  and a distributed Redis rate limiter — all tested (220 backend + 4 frontend)

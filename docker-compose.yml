@@ -22,6 +22,19 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: ai_employee_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build:
       context: .
@@ -31,6 +44,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       ENVIRONMENT: development
       DATABASE_URL: postgresql+asyncpg://postgres:Chinki@db:5432/ai_employee
@@ -38,6 +53,7 @@ services:
       JWT_ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: "60"
       CORS_ORIGINS: http://localhost:5173
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
     volumes:

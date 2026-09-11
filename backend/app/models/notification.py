@@ -7,8 +7,10 @@ record a mock "sent" message so the MVP needs no real messaging provider
 credentials (assumption A6).
 
 A notification row is immutable once created (no `updated_at`) — it is an
-audit-style record of *what was flagged and when*. Read state lives in the
-frontend / read-model, not on the row.
+audit-style record of *what was flagged and when*. Read state (Phase 9)
+lives in `notification_reads`: one row per (notification, user) marks that
+notification read by that member — notifications are business-scoped, so
+each member's read state is tracked independently.
 """
 
 import uuid
@@ -50,3 +52,25 @@ class Notification(UUIDPrimaryKeyMixin, Base):
     target_type: Mapped[str | None] = mapped_column(String(64), default=None)
     target_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class NotificationReadState(Base):
+    """Per-user read marker (Phase 9). Composite PK (notification, user) —
+    one row means that member has read that notification; absent means unread.
+    """
+
+    __tablename__ = "notification_reads"
+
+    notification_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("notifications.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+        nullable=False,
+    )
+    read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)

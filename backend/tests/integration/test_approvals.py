@@ -202,3 +202,141 @@ async def test_reject_leaves_po_cancelled(client, business, db_session):
 
     po = (await client.get(f"/api/purchase-orders/{po_id}", headers=headers)).json()
     assert po["status"] == "CANCELLED"
+
+
+# --- Phase 9: multi-stage (chained) approval ---
+
+
+async def _set_stages_policy(client, headers, stages: int):
+    await client.put(
+        "/api/policies/stages",
+        json={"policy_type": "APPROVAL_STAGES", "key": "stages", "value": {"stages": stages}},
+        headers=headers,
+    )
+
+
+async def _admin_headers(client, business) -> dict:
+    register = await client.post(
+        "/api/auth/register",
+        json={"email": f"admin-{uuid.uuid4().hex[:8]}@example.com", "password": "a-strong-password", "full_name": "Admin Tester"},
+    )
+    token = register.json()["access_token"]
+    await client.post(
+        "/api/businesses/members",
+        json={"email": register.json()["user"]["email"], "role": "ADMIN"},
+        headers=business["owner_headers"],
+    )
+    return {"Authorization": f"Bearer {token}", "X-Business-Id": business["business_id"]}
+
+
+async def _open_high_risk_po_approval(client, business, db_session) -> dict:
+    headers = business["owner_headers"]
+    await _seed_supplier_and_product(client, headers, price="200.00")
+    await client.put(
+        "/api/policies/po_threshold",
+        json={"policy_type": "MONEY_THRESHOLD", "key": "po_threshold", "value": {"amount": "500.00"}},
+        headers=headers,
+    )
+    _, user_id, task_id = await _new_user_and_task(client, business["business_id"], db_session)
+    provider = MockProvider(
+        script=[
+            {"tool": "classify_intent", "arguments": {"intent": "CREATE_PURCHASE_ORDER", "summary": "PO"}},
+            {"tool": "extract_purchase_order", "arguments": {"supplier_query": "Metro", "items": [{"product_query": "coffee", "quantity": 5}]}},
+        ]
+    )
+    await run_agent(
+        provider, db_session, business_id=business["business_id"], user_id=uuid.UUID(user_id),
+        role=BusinessRole.OWNER, task_id=uuid.UUID(task_id),
+        message="Prepare a purchase order from Metro for 5 coffee packets",
+    )
+    return (await client.get("/api/approvals?status_filter=PENDING", headers=headers)).json()[0]
+
+
+async def test_two_stage_approval_needs_two_different_approvers(client, business, db_session):
+    """With APPROVAL_STAGES=2, a HIGH-risk PO request needs two sequential
+    approvals by different people; the PO only leaves PENDING_APPROVAL after
+    the final stage approves."""
+    headers = business["owner_headers"]
+    admin_headers = await _admin_headers(client, business)
+    await _set_stages_policy(client, headers, 2)
+    approval = await _open_high_risk_po_approval(client, business, db_session)
+    po_id = approval["target_id"]
+
+    assert approval["required_stages"] == 2
+    assert approval["current_stage"] == 1
+    assert [s["status"] for s in approval["steps"]] == ["PENDING", "PENDING"]
+
+    # Stage 1: owner approves. The request stays PENDING for the next stage.
+    first = await client.post(
+        f"/api/approvals/{approval['id']}/approve", json={"decision_note": "stage 1 ok"}, headers=headers
+    )
+    assert first.status_code == 200
+    body = first.json()
+    assert body["status"] == "PENDING"
+    assert body["current_stage"] == 2
+    assert body["steps"][0]["status"] == "APPROVED"
+    assert body["steps"][1]["status"] == "PENDING"
+
+    # The PO is still gated while a stage remains.
+    po = (await client.get(f"/api/purchase-orders/{po_id}", headers=headers)).json()
+    assert po["status"] == "PENDING_APPROVAL"
+
+    # The same person cannot approve the next stage (no rubber-stamping).
+    same_user = await client.post(
+        f"/api/approvals/{approval['id']}/approve", json={"decision_note": "me again"}, headers=headers
+    )
+    assert same_user.status_code == 409
+
+    # A different approver (ADMIN) completes the chain.
+    second = await client.post(
+        f"/api/approvals/{approval['id']}/approve", json={"decision_note": "stage 2 ok"}, headers=admin_headers
+    )
+    assert second.status_code == 200
+    assert second.json()["status"] == "APPROVED"
+    assert second.json()["current_stage"] == 2
+    assert [s["status"] for s in second.json()["steps"]] == ["APPROVED", "APPROVED"]
+
+    po = (await client.get(f"/api/purchase-orders/{po_id}", headers=headers)).json()
+    assert po["status"] == "APPROVED"
+    send = await client.post(f"/api/purchase-orders/{po_id}/send", headers=headers)
+    assert send.status_code == 200
+
+
+async def test_rejection_at_second_stage_cancels_po(client, business, db_session):
+    """A rejection at any stage ends the chain and cancels the gated PO."""
+    headers = business["owner_headers"]
+    admin_headers = await _admin_headers(client, business)
+    await _set_stages_policy(client, headers, 2)
+    approval = await _open_high_risk_po_approval(client, business, db_session)
+    po_id = approval["target_id"]
+
+    await client.post(
+        f"/api/approvals/{approval['id']}/approve", json={"decision_note": "stage 1 ok"}, headers=headers
+    )
+    rejected = await client.post(
+        f"/api/approvals/{approval['id']}/reject", json={"decision_note": "no"}, headers=admin_headers
+    )
+    assert rejected.status_code == 200
+    assert rejected.json()["status"] == "REJECTED"
+    assert rejected.json()["steps"][1]["status"] == "REJECTED"
+
+    po = (await client.get(f"/api/purchase-orders/{po_id}", headers=headers)).json()
+    assert po["status"] == "CANCELLED"
+
+
+async def test_default_single_stage_when_no_policy(client, business, db_session):
+    """Without an APPROVAL_STAGES policy the behavior is exactly Phase 5: one
+    decision approves the request (required_stages defaults to 1)."""
+    headers = business["owner_headers"]
+    approval = await _open_high_risk_po_approval(client, business, db_session)
+    assert approval["required_stages"] == 1
+    assert approval["current_stage"] == 1
+    assert len(approval["steps"]) == 1
+
+    approve = await client.post(
+        f"/api/approvals/{approval['id']}/approve", json={"decision_note": "OK"}, headers=headers
+    )
+    assert approve.status_code == 200
+    assert approve.json()["status"] == "APPROVED"
+    po = (await client.get(f"/api/purchase-orders/{approval['target_id']}", headers=headers)).json()
+    assert po["status"] == "APPROVED"

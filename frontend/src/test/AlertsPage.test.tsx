@@ -7,6 +7,8 @@ import { AlertsPage } from "../pages/AlertsPage";
 
 vi.mock("../api/governance", () => ({
   listNotifications: vi.fn(),
+  markNotificationRead: vi.fn(),
+  markAllNotificationsRead: vi.fn(),
 }));
 
 vi.mock("../store/AuthContext", () => ({
@@ -66,6 +68,7 @@ describe("AlertsPage", () => {
         target_type: "product",
         target_id: "p1",
         created_at: "2026-09-08T00:00:00Z",
+        read: false,
       },
     ]);
     renderPage();

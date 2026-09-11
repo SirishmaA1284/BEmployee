@@ -5,6 +5,46 @@ All notable changes to this project are documented here, phase by phase (see
 
 ## [Unreleased]
 
+### Phase 9 — Distributed hardening (2026-09-11)
+
+- **PDF/DOCX extraction** (`app/services/extraction.py`): document uploads
+  now accept `application/pdf` (pypdf) and `.docx`
+  (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`,
+  python-docx — paragraphs + table cells) alongside the text-based formats.
+  Extraction is deterministic backend code; corrupt/encrypted files fail
+  with a clean 422 and nothing is persisted.
+- **Per-user read state for notifications**: `notification_reads` table
+  (composite PK notification+user) so each business member tracks their own
+  read state on business-scoped notifications. `GET /api/notifications`
+  returns `read` and filters with `unread_only`; `POST
+  /api/notifications/{id}/read` and `POST /api/notifications/read-all` mark
+  read (idempotent, tenant-scoped). Alerts page shows unread dots + per-card
+  and bulk "mark read".
+- **Multi-stage (chained) approval** (`app/models/approval.py` +
+  `approval_service.py`): new `APPROVAL_STAGES` policy (value `{"stages": N}`,
+  default 1 = Phase 5 single-decision behavior) and `approval_request_steps`
+  table. Each HIGH-risk request now carries one step per required stage;
+  stages resolve in order, the request stays PENDING until every stage is
+  APPROVED, and consecutive stages must be decided by *different* people
+  (no rubber-stamping). A rejection at any stage ends the chain and cancels
+  a gated PO. `ApprovalRequestRead` exposes `required_stages`,
+  `current_stage`, and `steps`; the Approvals page renders stage progress.
+- **Distributed rate limiting** (`app/security/rate_limit.py`): Redis-backed
+  fixed-window counters (INCR+EXPIRE pipeline) when `REDIS_URL` is set;
+  `init_rate_limiter()` runs in the FastAPI lifespan and falls back to the
+  in-process limiter (with a warning) if Redis is unreachable, so an outage
+  never takes the API down. New `redis` service in docker-compose; backend
+  wired to it. Tests still run against the in-process backend.
+- **Migration `1a2b3c4d5e6f`**: `approval_request_steps`, `notification_reads`,
+  `approval_requests.required_stages` (server_default 1), and the
+  `APPROVAL_STAGES` policy_type enum value. `alembic check` is clean apart
+  from the documented Phase 7 HNSW-index drift.
+- **Tests**: 220 backend total (26 new — 6 extraction unit incl. in-memory
+  PDF/DOCX builders, 7 rate-limiter unit with a fake Redis pipeline, 2 policy
+  `approval_stages_for` unit, 5 notification read-state integration, 3
+  multi-stage approval integration, 3 PDF/DOCX upload integration) + 4
+  frontend. Frontend build + lint + test all green.
+
 ### Real-time messaging (WhatsApp + Telegram)
 
 - **`app/services/messaging.py`**: real delivery for notifications — Telegram Bot

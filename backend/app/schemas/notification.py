@@ -18,3 +18,5 @@ class NotificationRead(BaseModel):
     target_type: str | None
     target_id: uuid.UUID | None
     created_at: datetime
+    # Per-user read state (Phase 9): true once the current member has read it.
+    read: bool

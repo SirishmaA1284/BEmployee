@@ -47,12 +47,21 @@ export async function listAuditLogs(limit = 100) {
   return data;
 }
 
-export async function listNotifications(typeFilter?: string, limit = 100) {
+export async function listNotifications(typeFilter?: string, unreadOnly = false, limit = 100) {
   const { data } = await apiClient.get<NotificationRead[]>("/api/notifications", {
     params: {
       type_filter: typeFilter || undefined,
+      unread_only: unreadOnly || undefined,
       limit,
     },
   });
   return data;
+}
+
+export async function markNotificationRead(notificationId: string) {
+  await apiClient.post(`/api/notifications/${notificationId}/read`);
+}
+
+export async function markAllNotificationsRead() {
+  await apiClient.post("/api/notifications/read-all");
 }
