@@ -86,8 +86,9 @@ export function DashboardPage() {
 
       <section className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">
         Ask the <strong>AI Employee</strong> (Chat page) to create orders, check stock, compare
-        suppliers or prepare purchase orders. Pending approvals and proactive alerts land here in
-        later phases.
+        suppliers or prepare purchase orders. Approvals waiting on you are on the{" "}
+        <strong>Approvals</strong> page; proactive alerts (low stock, forecasted stockouts,
+        daily reports) are on the <strong>Alerts</strong> page.
       </section>
     </PageLayout>
   );

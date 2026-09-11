@@ -7,6 +7,7 @@ export type AgentIntent =
   | "SEARCH_PRODUCTS"
   | "SEARCH_CUSTOMERS"
   | "SALES_REPORT"
+  | "ASK_DOCUMENTS"
   | "UNKNOWN";
 
 export type AgentSessionStatus =

@@ -71,6 +71,24 @@ export function InventoryPage() {
             onChange={(e) => setForm({ ...form, unit_price: e.target.value })}
             className="w-28 rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
+          <input
+            type="number"
+            min={0}
+            placeholder="Low-stock threshold"
+            title="Alert when stock drops to or below this quantity"
+            value={form.reorder_threshold}
+            onChange={(e) => setForm({ ...form, reorder_threshold: e.target.value })}
+            className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
+          <input
+            type="number"
+            min={0}
+            placeholder="Reorder qty"
+            title="How many units to reorder when stock is low"
+            value={form.reorder_quantity}
+            onChange={(e) => setForm({ ...form, reorder_quantity: e.target.value })}
+            className="w-28 rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
           <button
             type="submit"
             disabled={createMutation.isPending}

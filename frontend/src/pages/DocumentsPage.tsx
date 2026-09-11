@@ -58,8 +58,8 @@ export function DocumentsPage() {
     <PageLayout>
       <h1 className="text-lg font-semibold">Documents</h1>
       <p className="text-sm text-slate-500">
-        Upload business documents (text, markdown, CSV, JSON). They are chunked, embedded, and
-        searchable by the AI Employee via RAG.
+        Upload business documents (text, markdown, CSV, JSON, PDF, DOCX). They are chunked,
+        embedded, and searchable by the AI Employee via RAG.
       </p>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4">
@@ -67,7 +67,7 @@ export function DocumentsPage() {
         <form onSubmit={handleUpload} className="flex flex-wrap items-center gap-2">
           <input
             type="file"
-            accept=".txt,.md,.csv,.json"
+            accept=".txt,.md,.csv,.json,.pdf,.docx"
             onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
             className="text-sm"
           />
@@ -80,7 +80,9 @@ export function DocumentsPage() {
           </button>
         </form>
         {uploadMutation.isError && (
-          <p className="mt-2 text-sm text-red-600">Upload failed. Use a .txt/.md/.csv/.json file under 2 MiB.</p>
+          <p className="mt-2 text-sm text-red-600">
+            Upload failed. Use a .txt/.md/.csv/.json/.pdf/.docx file under 2 MiB.
+          </p>
         )}
       </section>
 

@@ -33,6 +33,7 @@ export function OrdersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
       setNewCustomer(false);
       setCustomerId("");
       setCustomerName("");

@@ -5,6 +5,21 @@ All notable changes to this project are documented here, phase by phase (see
 
 ## [Unreleased]
 
+### Page-link audit fixes (2026-09-11)
+
+Audited every page ↔ API link against the live backend (all endpoints 200).
+Fixes found:
+
+- **Documents page**: file picker and copy still said text-only — now
+  accepts/mentions PDF and DOCX (Phase 9 formats).
+- **Dashboard**: stale copy claiming approvals/alerts arrive "in later
+  phases" — now points to the live Approvals and Alerts pages.
+- **Inventory page**: the new-product form silently sent reorder threshold
+  and reorder quantity as hardcoded 0 — both are now real inputs.
+- **Chat page types**: `AgentIntent` was missing `ASK_DOCUMENTS` (Phase 7).
+- **Orders page**: creating an order now also refreshes the Inventory list
+  (stock was decremented).
+
 ### Approval fix — HIGH-risk orders now execute on approval (2026-09-11)
 
 Approving a HIGH-risk **order** request (money-threshold escalation) did
