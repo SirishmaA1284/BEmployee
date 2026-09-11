@@ -88,6 +88,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // When the refresh token is gone (expired/revoked), the API client clears
+  // the stored session and signals it so the UI drops to the login page.
+  useEffect(() => {
+    const onExpired = () => {
+      clearToken();
+      clearRefreshToken();
+      clearActiveBusinessId();
+      setUser(null);
+      setBusinesses([]);
+    };
+    window.addEventListener("auth:expired", onExpired);
+    return () => window.removeEventListener("auth:expired", onExpired);
+  }, []);
+
   const login = useCallback(
     async (email: string, password: string) => {
       const data = await authApi.login(email, password);

@@ -5,6 +5,22 @@ All notable changes to this project are documented here, phase by phase (see
 
 ## [Unreleased]
 
+### Phase 10 fix — automatic token refresh (2026-09-11)
+
+Access tokens expire after `ACCESS_TOKEN_EXPIRE_MINUTES` (default 60). The
+frontend previously only refreshed on page load, so after an hour every
+write (saving policies, creating orders, …) failed with 401 and the UI just
+said "could not save". The axios client now:
+
+- Intercepts 401 on any non-auth request, rotates the stored refresh token
+  once (`POST /api/auth/refresh`), stores the new pair, and replays the
+  original request with the fresh token.
+- Shares a single in-flight rotation across parallel 401s (one refresh for
+  a whole page of initial fetches, staying inside the refresh endpoint's
+  rate limit).
+- Clears the stored session and fires `auth:expired` when the refresh token
+  itself is dead, dropping the UI to the login page (AuthContext listener).
+
 ### Phase 10 — Inline customers (2026-09-11)
 
 A customer no longer blocks an order. When an order names a customer that
