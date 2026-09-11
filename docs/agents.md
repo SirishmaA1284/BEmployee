@@ -24,7 +24,7 @@ The orchestrator also enforces NFR-3: a per-request `llm_calls` counter capped a
 
 | Workflow | Intent(s) | Nodes | Tools used |
 |---|---|---|---|
-| Order (`workflows/order.py`) | CREATE_ORDER | extract → resolve → create → verify → summarize | search_customers, search_products, create_order, get_order (verification) |
+| Order (`workflows/order.py`) | CREATE_ORDER | extract → resolve → create → verify → summarize | search_customers, create_customer (only when the customer is unknown), search_products, create_order, get_order (verification) |
 | Inventory (`workflows/inventory.py`) | LOW_STOCK, CHECK_INVENTORY | extract → check (or check only) | list_low_stock, check_stock |
 | Procurement (`workflows/procurement.py`) | COMPARE_SUPPLIERS | extract → compare | search_products, compare_supplier_prices |
 | Procurement (`workflows/procurement.py`) | CREATE_PURCHASE_ORDER | extract → plan → create → verify → summarize | search_suppliers, search_products, list_low_stock, compare_supplier_prices, create_purchase_order, list_purchase_orders |
@@ -37,6 +37,9 @@ Notes:
 - **extract** nodes are prompt-layer only: the LLM turns natural language into a validated
   Pydantic structure (`OrderExtraction`, `PurchaseOrderExtraction`, …). It never touches data.
 - **resolve/plan** nodes map extracted names to real ids via registry tools and never guess.
+  Since Phase 10, an unknown customer is **auto-created** via the `create_customer` tool
+  (deduped by name/phone/email) instead of failing the order — "create an order for Meera"
+  works even when Meera is new; the summary notes the new customer was added.
 - **create** nodes call the registry, which runs the same deterministic services the REST API
   uses (`app/services/order_service.py`, `purchase_order_service.py`) — provably the same code
   path a human uses.

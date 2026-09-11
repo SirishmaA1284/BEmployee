@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.session import get_db
 from app.models.business_member import BusinessMember
 from app.models.customer import Customer
-from app.models.enums import BusinessRole, InvoiceStatus, OrderStatus, StockMovementReason
+from app.models.enums import AuditAction, BusinessRole, InvoiceStatus, OrderStatus, StockMovementReason
 from app.models.inventory import Inventory
 from app.models.invoice import Invoice
 from app.models.order import Order
@@ -17,6 +17,8 @@ from app.models.stock_movement import StockMovement
 from app.models.user import User
 from app.schemas.order import OrderCreate, OrderItemRead, OrderRead
 from app.security.dependencies import get_current_membership, get_current_user, require_role
+from app.services.audit_service import record_audit
+from app.services.customer_service import find_or_create_customer
 from app.services.errors import BusinessRuleError
 from app.services.order_service import create_order as create_order_service
 
@@ -76,12 +78,39 @@ async def create_order(
     validate customer/products -> check stock -> compute totals -> create
     order+items -> decrement inventory (+ log stock movements) -> generate
     invoice. All arithmetic is app/services/pricing.py, never inferred.
+
+    The customer can be referenced by `customer_id` or provided inline as
+    `customer` (name/phone/email) — inline customers are found or created
+    automatically, so a walk-in/new customer never blocks an order.
     """
+    customer_id = payload.customer_id
+    if payload.customer:
+        customer, created = await find_or_create_customer(
+            db,
+            business_id=membership.business_id,
+            name=payload.customer.name,
+            phone=payload.customer.phone,
+            email=payload.customer.email,
+        )
+        customer_id = customer.id
+        if created:
+            await record_audit(
+                db,
+                business_id=membership.business_id,
+                actor_type="USER",
+                actor_user_id=current_user.id,
+                action=AuditAction.CUSTOMER_CREATE,
+                target_type="customer",
+                target_id=customer.id,
+                summary=f"Customer {customer.name} created inline with order",
+                after={"name": customer.name, "phone": customer.phone},
+            )
+
     try:
         order = await create_order_service(
             db,
             business_id=membership.business_id,
-            customer_id=payload.customer_id,
+            customer_id=customer_id,
             items=[(line.product_id, line.quantity) for line in payload.items],
             created_by_user_id=current_user.id,
         )

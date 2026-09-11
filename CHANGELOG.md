@@ -5,6 +5,34 @@ All notable changes to this project are documented here, phase by phase (see
 
 ## [Unreleased]
 
+### Phase 10 — Inline customers (2026-09-11)
+
+A customer no longer blocks an order. When an order names a customer that
+doesn't exist, the system creates them automatically instead of failing:
+
+- **`create_customer` registry tool** (`app/tools/catalog.py`, MEDIUM risk,
+  any role): find-or-create, **deduped** by case-insensitive name, normalized
+  phone, or case-insensitive email (`app/services/customer_service.py`) — an
+  agent can safely auto-create customers and never duplicates them.
+- **Order agent workflow** (`app/agents/workflows/order.py`): when
+  `search_customers` finds no match, the workflow calls `create_customer`
+  with the extracted name and continues to the order; the summary says
+  "(new customer, added automatically)". Existing customers are untouched
+  (no extra tool call, no re-creation).
+- **REST `POST /api/orders`**: accepts inline `customer: {name, phone?,
+  email?}` instead of `customer_id` (exactly one of the two, else 422).
+  Inline creation is deduped like the tool and audited as
+  `CUSTOMER_CREATE` when a row is actually created; an unknown
+  `customer_id` is still 404.
+- **Frontend Orders page**: "New customer (not in the list)" checkbox with
+  name + optional phone inputs; the customer dropdown is replaced when it's
+  checked.
+- **Tests**: 227 backend total (7 new integration — agent auto-create with
+  the note in the reply, agent dedupe on repeat orders, existing customers
+  not re-created, REST inline creation + phone capture, REST name dedupe,
+  exactly-one-customer validation, unknown-id still 404) + 4 frontend.
+  Frontend build + lint + test all green.
+
 ### Phase 9 — Distributed hardening (2026-09-11)
 
 - **PDF/DOCX extraction** (`app/services/extraction.py`): document uploads

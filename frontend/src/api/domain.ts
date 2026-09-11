@@ -58,7 +58,11 @@ export async function listOrders() {
   return data;
 }
 
-export async function createOrder(payload: { customer_id: string; items: { product_id: string; quantity: number }[] }) {
+export async function createOrder(payload: {
+  customer_id?: string;
+  customer?: { name: string; email?: string; phone?: string };
+  items: { product_id: string; quantity: number }[];
+}) {
   const { data } = await apiClient.post<OrderRead>("/api/orders", payload);
   return data;
 }

@@ -37,6 +37,9 @@ class AgentState(TypedDict, total=False):
     # Order workflow scratch (declared so LangGraph merges node returns).
     customer_id: uuid.UUID
     customer_name: str
+    # True when the workflow auto-created the customer (Phase 10) — surfaced
+    # in the summary so the user knows a new customer was added.
+    customer_created: bool
     resolved_items: list[dict[str, Any]]
     created_order_id: uuid.UUID
 

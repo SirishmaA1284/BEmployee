@@ -30,6 +30,7 @@ from app.models.purchase_order_item import PurchaseOrderItem
 from app.models.supplier import Supplier
 from app.models.supplier_product import SupplierProduct
 from app.policies.risk import RiskLevel
+from app.services.customer_service import find_or_create_customer
 from app.services.errors import BusinessRuleError
 from app.services.inventory_service import is_low_stock
 from app.services.order_service import create_order as create_order_service
@@ -50,6 +51,12 @@ class GetProductArgs(BaseModel):
 
 class SearchCustomersArgs(BaseModel):
     query: str = Field(min_length=1, max_length=200)
+
+
+class CreateCustomerArgs(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    phone: str | None = Field(default=None, max_length=32)
+    email: str | None = Field(default=None, max_length=255)
 
 
 class CheckStockArgs(BaseModel):
@@ -179,6 +186,30 @@ async def search_customers(
         for c in result.scalars().all()
     ]
     return {"count": len(customers), "customers": customers}
+
+
+async def create_customer(
+    db: AsyncSession, business_id: uuid.UUID, user_id: uuid.UUID, args: CreateCustomerArgs
+) -> dict:
+    """Find-or-create a customer (deduped by name/phone/email). Idempotent:
+    calling it again with the same customer returns the existing row, so an
+    agent can safely auto-create customers mentioned in orders without ever
+    duplicating them.
+    """
+    customer, created = await find_or_create_customer(
+        db,
+        business_id=business_id,
+        name=args.name,
+        phone=args.phone,
+        email=args.email,
+    )
+    return {
+        "customer_id": str(customer.id),
+        "name": customer.name,
+        "phone": customer.phone,
+        "email": customer.email,
+        "created": created,
+    }
 
 
 async def check_stock(
@@ -424,6 +455,17 @@ def register_catalog() -> None:
             input_schema=SearchCustomersArgs,
             risk_level=RiskLevel.LOW,
             handler=search_customers,
+        )
+    )
+    registry.register(
+        ToolSpec(
+            name="create_customer",
+            description="Add a customer (or find the existing one with the same name/phone/email). "
+            "Safe to call for any customer mentioned in a request — never duplicates.",
+            input_schema=CreateCustomerArgs,
+            risk_level=RiskLevel.MEDIUM,
+            handler=create_customer,
+            action_summary="Added a customer",
         )
     )
     registry.register(

@@ -24,11 +24,13 @@ anything risky, verifies its own results, and leaves a full audit trail.
 > document upload → RAG (business-scoped pgvector retrieval, cited answers) and a minimal
 > read-only MCP server. Phase 8 hardens: rotating refresh tokens, per-IP rate limiting,
 > structured logging, seed/demo data, frontend lint + automated tests, deployment docs.
-> Phase 9 (current) adds PDF/DOCX upload extraction, per-user notification read state,
+> Phase 9 adds PDF/DOCX upload extraction, per-user notification read state,
 > multi-stage (chained) approvals via an `APPROVAL_STAGES` policy, and a distributed
-> Redis-backed rate limiter. A chat
+> Redis-backed rate limiter. Phase 10 makes new customers a non-event: an order that names a
+> customer who doesn't exist yet auto-creates them (inline on the Orders page, or via the
+> agent), deduped by name/phone/email. A chat
 > UI and the Orders/Inventory/Suppliers/Purchase Orders/Policies/Approvals/Alerts/Documents
-> pages are live in the frontend. 220 passing backend tests + 4 frontend tests
+> pages are live in the frontend. 227 passing backend tests + 4 frontend tests
 > (`docs/testing.md`).
 
 ## 1. What this is

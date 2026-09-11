@@ -2,9 +2,10 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.models.enums import OrderStatus
+from app.schemas.customer import CustomerCreate
 
 
 class OrderItemCreate(BaseModel):
@@ -13,8 +14,17 @@ class OrderItemCreate(BaseModel):
 
 
 class OrderCreate(BaseModel):
-    customer_id: uuid.UUID
+    customer_id: uuid.UUID | None = None
+    # Phase 10: inline customer creation — provide exactly one of
+    # `customer_id` (existing customer) or `customer` (find-or-create).
+    customer: CustomerCreate | None = None
     items: list[OrderItemCreate] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def exactly_one_customer(self) -> "OrderCreate":
+        if (self.customer_id is None) == (self.customer is None):
+            raise ValueError("Provide exactly one of customer_id or customer")
+        return self
 
 
 class OrderItemRead(BaseModel):

@@ -71,7 +71,9 @@ def build_order_workflow(provider: LLMProvider, db: AsyncSession):
 
     async def resolve_node(state: AgentState) -> dict[str, Any]:
         """Maps extracted names to real ids via registry tools. Never guesses
-        — only registry results are used.
+        — only registry results are used. If the customer doesn't exist yet,
+        the registry's `create_customer` tool adds them (deduped), so an
+        order for a brand-new customer just works.
         """
         if state.get("error") or not state.get("extraction"):
             return {}
@@ -83,13 +85,24 @@ def build_order_workflow(provider: LLMProvider, db: AsyncSession):
         if not customer_result.get("ok"):
             return {"error": f"Could not search customers: {customer_result.get('error')}"}
         customers = customer_result["data"].get("customers", [])
+
+        customer_created = False
         if not customers:
-            return {
-                "error": f"No customer matches '{extraction['customer_query']}'. "
-                "Add the customer first, then retry."
-            }
-        customer = customers[0]
-        customer_id = uuid.UUID(str(customer["customer_id"]))
+            created = await runner.run_tool(
+                state, db, "create_customer", {"name": extraction["customer_query"]}
+            )
+            if not created.get("ok"):
+                return {
+                    "error": f"Could not find or create customer "
+                    f"'{extraction['customer_query']}': {created.get('error')}"
+                }
+            customer_id = uuid.UUID(str(created["data"]["customer_id"]))
+            customer_name = created["data"]["name"]
+            customer_created = created["data"].get("created", False)
+        else:
+            customer = customers[0]
+            customer_id = uuid.UUID(str(customer["customer_id"]))
+            customer_name = customer["name"]
 
         resolved_items: list[dict[str, Any]] = []
         for line in extraction["items"]:
@@ -106,7 +119,12 @@ def build_order_workflow(provider: LLMProvider, db: AsyncSession):
                 {"product_id": product["product_id"], "quantity": line["quantity"]}
             )
 
-        return {"customer_id": customer_id, "customer_name": customer["name"], "resolved_items": resolved_items}
+        return {
+            "customer_id": customer_id,
+            "customer_name": customer_name,
+            "customer_created": customer_created,
+            "resolved_items": resolved_items,
+        }
 
     async def create_node(state: AgentState) -> dict[str, Any]:
         if state.get("error") or not state.get("customer_id"):
@@ -153,9 +171,13 @@ def build_order_workflow(provider: LLMProvider, db: AsyncSession):
             f"{item['quantity']} x {item['name']} ({item['line_total']} {order['currency']})"
             for item in order["items"]
         )
+        customer_note = (
+            f" (new customer, added automatically)" if state.get("customer_created") else ""
+        )
         return {
             "reply": (
-                f"Order {order['order_id'][:8]} created for {state['customer_name']} — "
+                f"Order {order['order_id'][:8]} created for {state['customer_name']}"
+                f"{customer_note} — "
                 f"total {order['total']} {order['currency']} ({lines}). "
                 f"Invoice {order['invoice_number']} was generated and stock was updated. Verified."
             ),

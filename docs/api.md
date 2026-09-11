@@ -119,12 +119,16 @@ Standard CRUD (`POST`/`GET`/`GET {id}`/`PATCH {id}`/`DELETE {id}`), any role can
 
 ## Orders (`app/api/orders.py`)
 
-- `POST /api/orders` — any role. Body: `customer_id`, `items: [{product_id, quantity}]`
-  (duplicate product lines are merged). Validates customer/products exist and are active,
-  checks stock (`app/services/inventory_service.py`), computes totals
-  (`app/services/pricing.py`), decrements inventory + logs `StockMovement`s, and generates an
-  `Invoice` — all in one transaction. 404 unknown customer/product; 422 insufficient stock
-  (no partial order is created).
+- `POST /api/orders` — any role. Body: `items: [{product_id, quantity}]` (duplicate product
+  lines are merged) plus **exactly one** of `customer_id` (existing customer) or `customer`
+  (inline `{name, phone?, email?}` — Phase 10: found by name/phone/email or created
+  automatically, so a new customer never blocks an order; 422 if both/neither are given).
+  Validates customer/products exist and are active, checks stock
+  (`app/services/inventory_service.py`), computes totals (`app/services/pricing.py`),
+  decrements inventory + logs `StockMovement`s, and generates an `Invoice` — all in one
+  transaction. 404 unknown customer/product (a `customer_id` that doesn't exist is still 404 —
+  only the inline `customer` object auto-creates); 422 insufficient stock (no partial order is
+  created).
 - `GET /api/orders`, `GET /api/orders/{id}` — any role.
 - `POST /api/orders/{id}/cancel` — OWNER/ADMIN. Restores stock, voids the invoice. 409 if
   already cancelled or if the invoice is already `PAID` (refunds aren't supported yet).

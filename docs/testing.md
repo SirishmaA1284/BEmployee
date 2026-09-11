@@ -1,8 +1,8 @@
 # Testing Strategy
 
-## Current coverage (through Phase 9)
+## Current coverage (through Phase 10)
 
-220 backend tests, all passing against a real Postgres test database (`ai_employee_test`, see
+227 backend tests, all passing against a real Postgres test database (`ai_employee_test`, see
 `docs/setup.md`). Frontend: 4 Vitest tests, `npm run lint` (ESLint) and `npm run build` clean.
 
 - `tests/unit/` (97): password hashing, JWT, deterministic services — pricing (line totals,
@@ -19,7 +19,7 @@
   single-page PDF) and DOCX samples (paragraphs + tables) with corrupt-file 422s, the
   rate-limiter backends (in-process window reset; Redis INCR+EXPIRE counting/limit/expiry
   against a fake pipeline), and the `approval_stages_for` policy helper.
-- `tests/integration/` (105): register/login/me, business creation/membership; product CRUD +
+- `tests/integration/` (112): register/login/me, business creation/membership; product CRUD +
   auto-created inventory + duplicate-SKU rejection; customer CRUD; supplier CRUD + price
   comparison ranking; inventory adjustment (incl. rejecting a negative result); the full order
   flow (stock check → decrement → invoice generation → cancel-restores-stock-and-voids-invoice);
@@ -55,7 +55,11 @@
   gated until the final stage, the same approver is rejected with 409 on consecutive stages,
   a second-approver rejection cancels the PO, and no-policy businesses keep the single-decision
   Phase 5 behavior), and PDF/DOCX uploads (binary files parsed into chunks, corrupt PDFs
-  rejected with 422 and nothing half-ingested).
+  rejected with 422 and nothing half-ingested); plus Phase 10 — inline customers (the agent
+  auto-creates an unknown customer and says so in the reply, repeat orders reuse the same
+  customer without duplication, existing customers are never re-created, REST orders accept a
+  `customer` object with phone capture + name dedupe, exactly-one-of validation, and an
+  unknown `customer_id` still 404s).
 - `tests/agents/` (9): full LangGraph workflows driven by a scripted `MockProvider` against the
   real test database — order end-to-end (extract → resolve → create → verify → summarize),
   unknown-product error path, low-stock, supplier ranking, direct + low-stock-driven purchase

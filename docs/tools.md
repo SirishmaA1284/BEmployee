@@ -37,13 +37,14 @@ Handlers never trust ids from the model: every query is filtered by the registry
 Errors are returned as `{"ok": false, "error": ...}` structured results — never raised into the
 LLM loop.
 
-## 3. Catalog (`app/tools/catalog.py` — 13 tools)
+## 3. Catalog (`app/tools/catalog.py` — 14 tools)
 
 | Tool | Risk | Roles | Purpose |
 |---|---|---|---|
 | `search_products` | LOW | any | name/SKU search |
 | `get_product` | LOW | any | product + stock detail |
 | `search_customers` | LOW | any | customer search |
+| `create_customer` | MEDIUM | any | find-or-create a customer (deduped by name/phone/email — never duplicates) |
 | `check_stock` | LOW | any | inventory levels (+ low-stock filter) |
 | `list_low_stock` | LOW | any | products at/below reorder threshold |
 | `compare_supplier_prices` | LOW | any | ranked supplier offers for a product (same ranking as the REST `/compare` endpoint) |

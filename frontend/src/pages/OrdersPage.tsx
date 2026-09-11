@@ -7,7 +7,10 @@ import { PageLayout } from "../components/PageLayout";
 
 export function OrdersPage() {
   const queryClient = useQueryClient();
+  const [newCustomer, setNewCustomer] = useState(false);
   const [customerId, setCustomerId] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [rows, setRows] = useState<{ product_name: string; product_id: string; quantity: string }[]>([
     { product_name: "", product_id: "", quantity: "1" },
   ]);
@@ -19,14 +22,21 @@ export function OrdersPage() {
   const createMutation = useMutation({
     mutationFn: () =>
       createOrder({
-        customer_id: customerId,
+        customer_id: newCustomer ? undefined : customerId,
+        customer: newCustomer
+          ? { name: customerName, phone: customerPhone || undefined }
+          : undefined,
         items: rows
           .filter((row) => row.product_id)
           .map((row) => ({ product_id: row.product_id, quantity: Number(row.quantity) })),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      setNewCustomer(false);
       setCustomerId("");
+      setCustomerName("");
+      setCustomerPhone("");
       setRows([{ product_name: "", product_id: "", quantity: "1" }]);
     },
   });
@@ -46,19 +56,47 @@ export function OrdersPage() {
       <section className="rounded-lg border border-slate-200 bg-white p-4">
         <h2 className="mb-3 text-sm font-semibold">New order</h2>
         <form onSubmit={handleSubmit} className="space-y-3">
-          <select
-            required
-            value={customerId}
-            onChange={(e) => setCustomerId(e.target.value)}
-            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-          >
-            <option value="">Select customer…</option>
-            {customersQuery.data?.map((customer) => (
-              <option key={customer.id} value={customer.id}>
-                {customer.name}
-              </option>
-            ))}
-          </select>
+          <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+            <input
+              type="checkbox"
+              checked={newCustomer}
+              onChange={(e) => setNewCustomer(e.target.checked)}
+              className="rounded border-slate-300"
+            />
+            New customer (not in the list)
+          </label>
+
+          {newCustomer ? (
+            <div className="flex flex-wrap gap-2">
+              <input
+                required
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="Customer name"
+                className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+              <input
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder="Phone (optional)"
+                className="w-48 rounded-md border border-slate-300 px-3 py-2 text-sm"
+              />
+            </div>
+          ) : (
+            <select
+              required
+              value={customerId}
+              onChange={(e) => setCustomerId(e.target.value)}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">Select customer…</option>
+              {customersQuery.data?.map((customer) => (
+                <option key={customer.id} value={customer.id}>
+                  {customer.name}
+                </option>
+              ))}
+            </select>
+          )}
 
           <div className="space-y-2">
             {rows.map((row, index) => (
@@ -112,7 +150,9 @@ export function OrdersPage() {
 
           <button
             type="submit"
-            disabled={createMutation.isPending || !customerId}
+            disabled={
+              createMutation.isPending || (newCustomer ? !customerName.trim() : !customerId)
+            }
             className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
           >
             {createMutation.isPending ? "Creating…" : "Create order"}
