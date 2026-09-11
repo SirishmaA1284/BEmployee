@@ -6,22 +6,48 @@ import {
   createPurchaseOrder,
   listProducts,
   listPurchaseOrders,
+  listSupplierProducts,
   listSuppliers,
   receivePurchaseOrder,
   sendPurchaseOrder,
 } from "../api/domain";
 import { PageLayout } from "../components/PageLayout";
 
+type Line = { product_id: string; quantity: string; unit_cost: string };
+
+function errorDetail(error: unknown): string {
+  const err = error as { response?: { data?: { detail?: unknown } } };
+  const detail = err.response?.data?.detail;
+  if (typeof detail === "string" && detail.length > 0) {
+    return detail;
+  }
+  return "Could not create the purchase order.";
+}
+
 export function PurchaseOrdersPage() {
   const queryClient = useQueryClient();
   const [supplierId, setSupplierId] = useState("");
-  const [rows, setRows] = useState<{ product_id: string; quantity: string }[]>([
-    { product_id: "", quantity: "1" },
-  ]);
+  const [rows, setRows] = useState<Line[]>([{ product_id: "", quantity: "1", unit_cost: "" }]);
 
   const posQuery = useQuery({ queryKey: ["purchase-orders"], queryFn: listPurchaseOrders });
   const suppliersQuery = useQuery({ queryKey: ["suppliers"], queryFn: listSuppliers });
   const productsQuery = useQuery({ queryKey: ["products"], queryFn: () => listProducts() });
+  // On-file prices for the selected supplier, used to prefill unit costs.
+  const supplierProductsQuery = useQuery({
+    queryKey: ["supplier-products", supplierId],
+    queryFn: () => listSupplierProducts(supplierId),
+    enabled: Boolean(supplierId),
+  });
+  const onFilePrice = new Map(
+    (supplierProductsQuery.data ?? []).map((sp) => [sp.product_id, sp.price])
+  );
+
+  function selectSupplier(nextSupplierId: string) {
+    setSupplierId(nextSupplierId);
+    setRows((prev) =>
+      prev.map((row) => ({ ...row, unit_cost: "" }))
+    );
+  }
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -29,12 +55,16 @@ export function PurchaseOrdersPage() {
         supplier_id: supplierId,
         items: rows
           .filter((row) => row.product_id)
-          .map((row) => ({ product_id: row.product_id, quantity: Number(row.quantity) })),
+          .map((row) => ({
+            product_id: row.product_id,
+            quantity: Number(row.quantity),
+            unit_cost: row.unit_cost ? Number(row.unit_cost) : undefined,
+          })),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
       setSupplierId("");
-      setRows([{ product_id: "", quantity: "1" }]);
+      setRows([{ product_id: "", quantity: "1", unit_cost: "" }]);
     },
   });
 
@@ -70,7 +100,7 @@ export function PurchaseOrdersPage() {
           <select
             required
             value={supplierId}
-            onChange={(e) => setSupplierId(e.target.value)}
+            onChange={(e) => selectSupplier(e.target.value)}
             className="rounded-md border border-slate-300 px-3 py-2 text-sm"
           >
             <option value="">Select supplier…</option>
@@ -84,49 +114,75 @@ export function PurchaseOrdersPage() {
           </select>
 
           <div className="space-y-2">
-            {rows.map((row, index) => (
-              <div key={index} className="flex gap-2">
-                <select
-                  value={row.product_id}
-                  onChange={(e) => setRows((prev) => {
-                    const next = [...prev];
-                    next[index] = { ...next[index], product_id: e.target.value };
-                    return next;
-                  })}
-                  className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
-                >
-                  <option value="">Select product…</option>
-                  {productsQuery.data
-                    ?.filter((p) => p.is_active)
-                    .map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.name} ({product.sku})
-                      </option>
-                    ))}
-                </select>
-                <input
-                  type="number"
-                  min={1}
-                  value={row.quantity}
-                  onChange={(e) => setRows((prev) => {
-                    const next = [...prev];
-                    next[index] = { ...next[index], quantity: e.target.value };
-                    return next;
-                  })}
-                  className="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}
-                  className="rounded-md border border-slate-300 px-2 text-sm hover:bg-slate-50"
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
+            {rows.map((row, index) => {
+              const price = row.product_id ? onFilePrice.get(row.product_id) : undefined;
+              return (
+                <div key={index} className="flex gap-2">
+                  <select
+                    value={row.product_id}
+                    onChange={(e) => setRows((prev) => {
+                      const next = [...prev];
+                      next[index] = {
+                        ...next[index],
+                        product_id: e.target.value,
+                        // Prefill the supplier's on-file price when there is one.
+                        unit_cost: onFilePrice.get(e.target.value) ?? "",
+                      };
+                      return next;
+                    })}
+                    className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  >
+                    <option value="">Select product…</option>
+                    {productsQuery.data
+                      ?.filter((p) => p.is_active)
+                      .map((product) => (
+                        <option key={product.id} value={product.id}>
+                          {product.name} ({product.sku})
+                        </option>
+                      ))}
+                  </select>
+                  <input
+                    type="number"
+                    min={1}
+                    value={row.quantity}
+                    onChange={(e) => setRows((prev) => {
+                      const next = [...prev];
+                      next[index] = { ...next[index], quantity: e.target.value };
+                      return next;
+                    })}
+                    className="w-24 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={row.unit_cost}
+                    onChange={(e) => setRows((prev) => {
+                      const next = [...prev];
+                      next[index] = { ...next[index], unit_cost: e.target.value };
+                      return next;
+                    })}
+                    placeholder={price ? `price ${price}` : "cost?"}
+                    title={
+                      price
+                        ? `On-file price for this product: ${price}`
+                        : "No price on file for this product from this supplier — enter a unit cost"
+                    }
+                    className="w-28 rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}
+                    className="rounded-md border border-slate-300 px-2 text-sm hover:bg-slate-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              );
+            })}
             <button
               type="button"
-              onClick={() => setRows((prev) => [...prev, { product_id: "", quantity: "1" }])}
+              onClick={() => setRows((prev) => [...prev, { product_id: "", quantity: "1", unit_cost: "" }])}
               className="rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50"
             >
               + Add line
@@ -140,7 +196,9 @@ export function PurchaseOrdersPage() {
           >
             {createMutation.isPending ? "Creating…" : "Create draft"}
           </button>
-          {createMutation.isError && <p className="text-sm text-red-600">Could not create the purchase order.</p>}
+          {createMutation.isError && (
+            <p className="text-sm text-red-600">{errorDetail(createMutation.error)}</p>
+          )}
         </form>
       </section>
 

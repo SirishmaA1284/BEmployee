@@ -105,7 +105,7 @@ export async function listPurchaseOrders() {
 
 export async function createPurchaseOrder(payload: {
   supplier_id: string;
-  items: { product_id: string; quantity: number }[];
+  items: { product_id: string; quantity: number; unit_cost?: number }[];
 }) {
   const { data } = await apiClient.post<PurchaseOrderRead>("/api/purchase-orders", payload);
   return data;

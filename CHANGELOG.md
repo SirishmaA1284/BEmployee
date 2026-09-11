@@ -5,6 +5,22 @@ All notable changes to this project are documented here, phase by phase (see
 
 ## [Unreleased]
 
+### Purchase Order page fix — unit cost + real errors (2026-09-11)
+
+Creating a draft PO failed with a generic "Could not create the purchase
+order" whenever the selected supplier had **no on-file price** for the
+product (`supplier_products`), because the backend requires a `unit_cost`
+override in that case but the form never sent one. The page now:
+
+- Adds a **unit cost input per line**: prefilled with the supplier's
+  on-file price when one exists (loaded per selected supplier), or left
+  empty for the user to type the cost when there is no price on file.
+- Sends `unit_cost` only when filled; omitting it still uses the on-file
+  price, so linked products keep working exactly as before.
+- Shows the **backend's actual error detail** (e.g. "No on-file price for
+  JGI221 from this supplier — provide unit_cost") instead of a generic
+  message.
+
 ### Phase 10 fix — automatic token refresh (2026-09-11)
 
 Access tokens expire after `ACCESS_TOKEN_EXPIRE_MINUTES` (default 60). The
