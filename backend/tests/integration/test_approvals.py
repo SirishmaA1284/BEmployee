@@ -340,3 +340,88 @@ async def test_default_single_stage_when_no_policy(client, business, db_session)
     assert approve.json()["status"] == "APPROVED"
     po = (await client.get(f"/api/purchase-orders/{approval['target_id']}", headers=headers)).json()
     assert po["status"] == "APPROVED"
+
+
+# --- Phase 10 fix: approved HIGH-risk ORDERS are executed ---
+
+
+async def _open_high_risk_order_approval(client, business, db_session) -> dict:
+    headers = business["owner_headers"]
+    customer = (await client.post("/api/customers", json={"name": "Rahul"}, headers=headers)).json()
+    product = (
+        await client.post(
+            "/api/products", json={"sku": "COFFEE-500", "name": "Coffee 500g", "unit_price": "250.00"}, headers=headers
+        )
+    ).json()
+    await client.post(
+        f"/api/inventory/{product['id']}/adjust", json={"change_quantity": 10}, headers=headers
+    )
+    await client.put(
+        "/api/policies/order_threshold",
+        json={"policy_type": "MONEY_THRESHOLD", "key": "order_threshold", "value": {"amount": "500.00"}},
+        headers=headers,
+    )
+    _, user_id, task_id = await _new_user_and_task(client, business["business_id"], db_session)
+    provider = MockProvider(
+        script=[
+            {"tool": "classify_intent", "arguments": {"intent": "CREATE_ORDER", "summary": "Order"}},
+            {
+                "tool": "extract_order",
+                "arguments": {"customer_query": "Rahul", "items": [{"product_query": "coffee", "quantity": 3}]},
+            },
+        ]
+    )
+    state = await run_agent(
+        provider, db_session, business_id=business["business_id"], user_id=uuid.UUID(user_id),
+        role=BusinessRole.OWNER, task_id=uuid.UUID(task_id),
+        message="Create an order for Rahul with 3 coffee packets",
+    )
+    assert "needs a human approval" in state["reply"]
+    return (await client.get("/api/approvals?status_filter=PENDING", headers=headers)).json()[0]
+
+
+async def test_approved_high_risk_order_is_executed(client, business, db_session):
+    """Approving a HIGH-risk order request creates the order: stock decrements,
+    an invoice is generated, and the approval request links to the order."""
+    headers = business["owner_headers"]
+    approval = await _open_high_risk_order_approval(client, business, db_session)
+
+    # Nothing was created while the request waited.
+    assert approval["target_type"] is None
+    orders = (await client.get("/api/orders", headers=headers)).json()
+    assert orders == []
+
+    approve = await client.post(
+        f"/api/approvals/{approval['id']}/approve", json={"decision_note": "OK"}, headers=headers
+    )
+    assert approve.status_code == 200, approve.text
+    body = approve.json()
+    assert body["status"] == "APPROVED"
+    assert body["target_type"] == "order"
+    assert body["target_id"]
+
+    orders = (await client.get("/api/orders", headers=headers)).json()
+    assert len(orders) == 1
+    order = orders[0]
+    assert order["customer_name"] == "Rahul"
+    assert order["total"] == "750.00"
+    assert order["invoice_number"]
+
+    inventory = (await client.get("/api/inventory", headers=headers)).json()
+    assert inventory[0]["quantity_on_hand"] == 7  # 10 - 3
+
+
+async def test_rejected_high_risk_order_creates_nothing(client, business, db_session):
+    headers = business["owner_headers"]
+    approval = await _open_high_risk_order_approval(client, business, db_session)
+
+    reject = await client.post(
+        f"/api/approvals/{approval['id']}/reject", json={"decision_note": "No"}, headers=headers
+    )
+    assert reject.status_code == 200
+    assert reject.json()["status"] == "REJECTED"
+
+    orders = (await client.get("/api/orders", headers=headers)).json()
+    assert orders == []
+    inventory = (await client.get("/api/inventory", headers=headers)).json()
+    assert inventory[0]["quantity_on_hand"] == 10  # untouched

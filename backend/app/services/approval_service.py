@@ -49,6 +49,57 @@ def _current_step(approval: ApprovalRequest) -> ApprovalStep | None:
     return next((s for s in approval.steps if s.status == ApprovalStatus.PENDING), None)
 
 
+async def _execute_approved_order(
+    db: AsyncSession,
+    *,
+    approval: ApprovalRequest,
+    business_id: uuid.UUID,
+    resolver_user_id: uuid.UUID,
+) -> None:
+    """Replays an approved `create_order` proposal against the deterministic
+    order service and links the created order to the approval request.
+
+    Raises BusinessRuleError(409) when the stored payload is malformed or
+    the action can no longer run (e.g. stock ran out while waiting for
+    approval). On failure nothing is persisted — the request stays PENDING
+    for the approver to reject or retry.
+    """
+    from app.services.order_service import create_order as create_order_service
+
+    try:
+        payload = approval.payload
+        customer_id = uuid.UUID(str(payload["customer_id"]))
+        items = [
+            (uuid.UUID(str(item["product_id"])), int(item["quantity"]))
+            for item in payload.get("items", [])
+        ]
+        if not items:
+            raise ValueError("no items")
+    except (KeyError, TypeError, ValueError) as exc:
+        raise BusinessRuleError(
+            409, "Approved order could not be executed: stored proposal is malformed"
+        ) from exc
+
+    try:
+        order = await create_order_service(
+            db,
+            business_id=business_id,
+            customer_id=customer_id,
+            items=items,
+            created_by_user_id=resolver_user_id,
+        )
+    except BusinessRuleError as exc:
+        detail = exc.detail if isinstance(exc.detail, str) else "action no longer valid"
+        raise BusinessRuleError(
+            409, f"Approved order could not be executed: {detail}"
+        ) from exc
+
+    # Link the executed order to the request so the approval trail points at
+    # the concrete result (mirrors how POs get target_type/target_id).
+    approval.target_type = "order"
+    approval.target_id = order.id
+
+
 async def create_approval_request(
     db: AsyncSession,
     *,
@@ -156,6 +207,22 @@ async def decide(
         approval.resolved_by_user_id = resolver_user_id
         approval.resolved_at = utcnow()
         approval.decision_note = decision_note
+
+        # Actions that were STOPPED before execution (no target row exists
+        # yet) are replayed now, through the same deterministic service the
+        # REST/agent paths use. Today only `create_order` can be in this
+        # situation — purchase orders are pre-created in PENDING_APPROVAL so
+        # they only need the status transition below. The stored payload is
+        # the validated proposal from request time; services re-validate
+        # stock/availability at execution time, so a proposal that can no
+        # longer run fails here (409) instead of silently creating nothing.
+        if approval.action == "create_order":
+            await _execute_approved_order(
+                db,
+                approval=approval,
+                business_id=business_id,
+                resolver_user_id=resolver_user_id,
+            )
     else:
         step.status = ApprovalStatus.REJECTED
         step.resolved_by_user_id = resolver_user_id

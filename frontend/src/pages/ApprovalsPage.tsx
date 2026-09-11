@@ -37,6 +37,8 @@ export function ApprovalsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["approvals"] });
       queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
     },
   });
 

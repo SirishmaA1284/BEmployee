@@ -5,6 +5,28 @@ All notable changes to this project are documented here, phase by phase (see
 
 ## [Unreleased]
 
+### Approval fix — HIGH-risk orders now execute on approval (2026-09-11)
+
+Approving a HIGH-risk **order** request (money-threshold escalation) did
+nothing: the registry correctly stopped before execution, but `decide`
+only transitioned pre-created purchase orders, so the order was never
+created. Now:
+
+- On final approval, a `create_order` request is **replayed through the
+  same deterministic order service** (`app/services/order_service.py`) with
+  the stored validated payload: stock is re-checked and decremented, the
+  invoice is generated, and the approval request is linked to the created
+  order (`target_type=order`, `target_id`).
+- If the action can no longer run (e.g. stock ran out while waiting), the
+  decision fails with 409 and nothing is persisted — the request stays
+  PENDING for the approver to reject or retry.
+- Rejection still creates nothing. Multi-stage requests replay only after
+  the final stage approves.
+- Frontend: approving/rejecting now refreshes the Orders and Inventory
+  lists too, so the created order appears immediately.
+- Tests: 229 backend (2 new — approve-executes-order with stock/invoice
+  assertions + target linking, reject-creates-nothing) + 4 frontend.
+
 ### Purchase Order page fix — unit cost + real errors (2026-09-11)
 
 Creating a draft PO failed with a generic "Could not create the purchase
